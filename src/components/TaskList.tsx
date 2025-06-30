@@ -129,12 +129,16 @@ export default function TaskList({ userId }: { userId: string }) {
       // Links
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">$1</a>')
       
-      // Lists
-      .replace(/^\* (.*$)/gim, '<li class="ml-4 text-gray-300">$1</li>')
-      .replace(/^- (.*$)/gim, '<li class="ml-4 text-gray-300">$1</li>')
-      .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4 text-gray-300">$2</li>')
+      // Lists - wrap in ul/ol tags
+      .replace(/^(\*|-|\d+\.) (.*$)/gim, (match, bullet, content) => {
+        if (bullet.match(/\d+/)) {
+          return `<li class="ml-4 text-gray-300 list-decimal">${content}</li>`
+        } else {
+          return `<li class="ml-4 text-gray-300 list-disc">${content}</li>`
+        }
+      })
       
-      // Tables
+      // Tables - simple table handling
       .replace(/\|(.+)\|/g, (match) => {
         const cells = match.split('|').filter(cell => cell.trim())
         if (cells.length > 1) {
@@ -309,7 +313,12 @@ export default function TaskList({ userId }: { userId: string }) {
                   </div>
                   <div className="bg-emerald-900/20 rounded-lg p-3 border border-emerald-700/30">
                     <div className="prose prose-invert prose-sm max-w-none">
-                      {renderMarkdown(task.result)}
+                      <div 
+                        className="text-emerald-200 leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(task.result)
+                        }}
+                      />
                     </div>
                   </div>
                 </div>

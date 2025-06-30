@@ -231,18 +231,31 @@ export class AgentService {
     // Determine agent type and execute specialized logic
     const agentType = this.determineAgentType(agent)
     
+    console.log(`🔍 Agent Type Detection:`, {
+      agentName: agent.name,
+      agentDescription: agent.description,
+      agentPrompt: agent.task_prompt,
+      detectedType: agentType
+    })
+    
     switch (agentType) {
       case 'startup-news':
+        console.log('🚀 Executing Startup News Agent')
         return await this.executeStartupNewsAgent(agent, taskId, userId)
       case 'market-analysis':
+        console.log('📊 Executing Market Analysis Agent')
         return await this.executeMarketAnalysisAgent(agent, taskId, userId)
       case 'competitor-monitor':
+        console.log('🕵️ Executing Competitor Monitor Agent')
         return await this.executeCompetitorMonitorAgent(agent, taskId, userId)
       case 'content-curator':
+        console.log('📚 Executing Content Curator Agent')
         return await this.executeContentCuratorAgent(agent, taskId, userId)
       case 'social-media-monitor':
+        console.log('📱 Executing Social Media Monitor Agent')
         return await this.executeSocialMediaMonitorAgent(agent, taskId, userId)
       default:
+        console.log('🤖 Executing Generic AI Service')
         return await aiService.processTask({
           taskId,
           prompt: agent.task_prompt,
@@ -256,22 +269,30 @@ export class AgentService {
     const description = agent.description.toLowerCase()
     const prompt = agent.task_prompt.toLowerCase()
     
+    console.log(`🔍 Checking agent type:`, { name, description, prompt })
+    
     if (name.includes('startup') || name.includes('news') || prompt.includes('startup news')) {
+      console.log('✅ Detected: startup-news')
       return 'startup-news'
     }
     if (name.includes('market') || name.includes('analysis') || prompt.includes('market analysis')) {
+      console.log('✅ Detected: market-analysis')
       return 'market-analysis'
     }
     if (name.includes('competitor') || name.includes('monitor') || prompt.includes('competitor')) {
+      console.log('✅ Detected: competitor-monitor')
       return 'competitor-monitor'
     }
     if (name.includes('content') || name.includes('curator') || prompt.includes('curate')) {
+      console.log('✅ Detected: content-curator')
       return 'content-curator'
     }
     if (name.includes('social') || name.includes('media') || prompt.includes('social media')) {
+      console.log('✅ Detected: social-media-monitor')
       return 'social-media-monitor'
     }
     
+    console.log('❌ No specific type detected, using generic')
     return 'generic'
   }
 
