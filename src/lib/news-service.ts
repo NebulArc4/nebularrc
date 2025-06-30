@@ -9,7 +9,7 @@ export class NewsService {
     const url = `${NEWS_API_URL}?country=${country}&category=${category}&q=${encodeURIComponent(q)}&apiKey=${NEWS_API_KEY}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`NewsAPI error: ${res.status}`);
-    const data = await res.json();
+    const data = (await res.json()) as { articles?: any[] };
     return data.articles || [];
   }
 }
