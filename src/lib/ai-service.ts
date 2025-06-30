@@ -69,10 +69,14 @@ export class AIService {
     // Check Hugging Face
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
-        await hf.textGeneration({
-          model: 'deepseek-ai/DeepSeek-R1-0528',
-          inputs: 'test',
-          parameters: { max_new_tokens: 1, return_full_text: false }
+        await (hf as any).conversational({
+          model: 'HuggingFaceH4/zephyr-7b-beta',
+          inputs: {
+            text: 'test',
+            past_user_inputs: [],
+            generated_responses: []
+          },
+          parameters: { max_new_tokens: 1 }
         })
         this.providers.huggingface = true
         console.log('✅ Hugging Face API available')
@@ -273,20 +277,23 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    // Use DeepSeek-R1-0528 as the default model
-    const model = request.model || 'deepseek-ai/DeepSeek-R1-0528'
+    // Use Zephyr-7B-Beta as the default model with conversational API
+    const model = request.model || 'HuggingFaceH4/zephyr-7b-beta'
     
     console.log(`Processing with Hugging Face model: ${model}`)
 
     try {
-      const response = await hf.textGeneration({
+      const response = await (hf as any).conversational({
         model: model,
-        inputs: request.prompt,
+        inputs: {
+          text: request.prompt,
+          past_user_inputs: [],
+          generated_responses: []
+        },
         parameters: {
           max_new_tokens: 500,
           temperature: 0.7,
-          do_sample: true,
-          return_full_text: false
+          do_sample: true
         }
       })
 
