@@ -111,6 +111,46 @@ export default function TaskList({ userId }: { userId: string }) {
     }
   }
 
+  const renderMarkdown = (text: string): string => {
+    if (!text) return ''
+    
+    return text
+      // Headers
+      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-white mb-2">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-white mb-3">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-white mb-4">$1</h1>')
+      
+      // Bold
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>')
+      
+      // Italic
+      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+      
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">$1</a>')
+      
+      // Lists
+      .replace(/^\* (.*$)/gim, '<li class="ml-4 text-gray-300">$1</li>')
+      .replace(/^- (.*$)/gim, '<li class="ml-4 text-gray-300">$1</li>')
+      .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4 text-gray-300">$2</li>')
+      
+      // Tables
+      .replace(/\|(.+)\|/g, (match) => {
+        const cells = match.split('|').filter(cell => cell.trim())
+        if (cells.length > 1) {
+          const cellHtml = cells.map(cell => `<td class="px-3 py-2 border border-gray-600 text-gray-300">${cell.trim()}</td>`).join('')
+          return `<tr>${cellHtml}</tr>`
+        }
+        return match
+      })
+      
+      // Horizontal rules
+      .replace(/^---$/gim, '<hr class="border-gray-600 my-4">')
+      
+      // Line breaks
+      .replace(/\n/g, '<br>')
+  }
+
   if (loading) {
     return (
       <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
@@ -252,9 +292,9 @@ export default function TaskList({ userId }: { userId: string }) {
                   <span className="text-blue-300 text-sm font-medium">Task #{tasks.length - idx}</span>
                 </div>
                 <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/30">
-                  <p className="text-gray-200 leading-relaxed text-sm">
-                    {task.task_prompt}
-                  </p>
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    {renderMarkdown(task.task_prompt)}
+                  </div>
                 </div>
               </div>
 
@@ -269,9 +309,7 @@ export default function TaskList({ userId }: { userId: string }) {
                   </div>
                   <div className="bg-emerald-900/20 rounded-lg p-3 border border-emerald-700/30">
                     <div className="prose prose-invert prose-sm max-w-none">
-                      <p className="text-emerald-200 leading-relaxed whitespace-pre-wrap">
-                        {task.result}
-                      </p>
+                      {renderMarkdown(task.result)}
                     </div>
                   </div>
                 </div>
