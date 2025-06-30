@@ -230,69 +230,101 @@ export class AgentService {
   }
 
   private async executeSpecializedAgentTask(agent: Agent, taskId: string, userId: string): Promise<any> {
-    const agentType = this.determineAgentType(agent)
-    
-    console.log(`🤖 Executing specialized agent: ${agentType}`)
-    
-    // Use real AI for specialized agents instead of mock data
-    try {
-      const aiResponse = await aiService.processTask({
-        taskId,
-        prompt: agent.task_prompt,
-        userId: userId,
-        provider: 'huggingface' // Use Hugging Face with Zephyr-7B-Beta
-      })
-      
+    // --- INTENT DETECTION ---
+    const prompt = agent.task_prompt.toLowerCase();
+    const newsKeywords = ['news', 'headline', 'headlines', 'update', 'updates', 'breaking', 'latest', 'report', 'story', 'stories', 'score', 'scores', 'sports', 'nba', 'nfl', 'mlb', 'soccer', 'football'];
+    const isNewsIntent = newsKeywords.some(k => prompt.includes(k));
+
+    if (isNewsIntent) {
+      // --- FETCH REAL DATA ---
+      let articles = [];
+      try {
+        articles = await newsService.getTopHeadlines({ category: 'sports', country: 'us', q: '' });
+      } catch (err) {
+        console.error('Failed to fetch real news:', err);
+        // fallback to mock data
+        articles = [
+          {
+            title: "Lakers vs Warriors: Epic Showdown in Western Conference Finals",
+            description: "The Los Angeles Lakers defeated the Golden State Warriors 120-115 in a thrilling Game 7, advancing to the NBA Finals. LeBron James scored 35 points with 12 assists.",
+            url: "https://www.nba.com/lakers-warriors-game7-2024",
+            urlToImage: null,
+            source: { name: "NBA" }
+          }
+        ];
+      }
+      // --- AI SUMMARIZATION ---
+      let aiSummary = '';
+      try {
+        const aiResponse = await aiService.processTask({
+          taskId,
+          prompt: `Summarize these sports news headlines in 3 bullet points for a business dashboard.\n${articles.map(a => a.title + ': ' + a.description).join('\n')}`,
+          userId
+        });
+        aiSummary = aiResponse.result;
+      } catch (err) {
+        aiSummary = '';
+      }
+      // --- STRUCTURED RESPONSE ---
       return {
         taskId,
-        result: aiResponse.result,
+        result: JSON.stringify({
+          type: 'news-cards',
+          articles: articles.map(a => ({
+            title: a.title,
+            summary: a.description,
+            image: a.urlToImage || null,
+            url: a.url,
+            source: a.source?.name || 'Unknown'
+          })),
+          aiSummary
+        }),
         status: 'completed',
-        model: aiResponse.model,
-        provider: aiResponse.provider,
-        tokensUsed: aiResponse.tokensUsed
-      }
-    } catch (error) {
-      console.error(`Error with real AI for ${agentType}:`, error)
-      
-      // Fallback to mock data if real AI fails
-      switch (agentType) {
-        case 'startup-news':
-          console.log('📰 Executing Startup News Agent (fallback)')
-          return await this.executeStartupNewsAgent(agent, taskId, userId)
-        case 'market-analysis':
-          console.log('📊 Executing Market Analysis Agent (fallback)')
-          return await this.executeMarketAnalysisAgent(agent, taskId, userId)
-        case 'competitor-monitor':
-          console.log('🕵️ Executing Competitor Monitor Agent (fallback)')
-          return await this.executeCompetitorMonitorAgent(agent, taskId, userId)
-        case 'content-curator':
-          console.log('📝 Executing Content Curator Agent (fallback)')
-          return await this.executeContentCuratorAgent(agent, taskId, userId)
-        case 'social-media-monitor':
-          console.log('📱 Executing Social Media Monitor Agent (fallback)')
-          return await this.executeSocialMediaMonitorAgent(agent, taskId, userId)
-        case 'sports-news':
-          console.log('🏈 Executing Sports News Agent (fallback)')
-          return await this.executeSportsNewsAgent(agent, taskId, userId)
-        default:
-          console.log('🤖 Executing Generic AI Service (fallback)')
-          return await aiService.processTask({
-            taskId,
-            prompt: agent.task_prompt,
-            userId: userId,
-            provider: 'mock'
-          })
-      }
+        model: 'newsapi+ai',
+        tokensUsed: 0
+      };
     }
+    // --- FALLBACK: LLM ---
+    // Use the existing LLM pipeline for other prompts
+    const aiResponse = await aiService.processTask({
+      taskId,
+      prompt: agent.task_prompt,
+      userId,
+      provider: 'google'
+    });
+    return {
+      taskId,
+      result: aiResponse.result,
+      status: aiResponse.status,
+      model: aiResponse.model,
+      tokensUsed: aiResponse.tokensUsed
+    };
   }
 
   private determineAgentType(agent: Agent): string {
     const name = agent.name.toLowerCase()
     const description = agent.description.toLowerCase()
     const prompt = agent.task_prompt.toLowerCase()
-    
-    console.log(`🔍 Checking agent type:`, { name, description, prompt })
-    
+
+    // Enhanced keyword detection for news/sports
+    const newsKeywords = [
+      'news', 'headline', 'headlines', 'update', 'updates', 'breaking', 'latest', 'report', 'story', 'stories'
+    ]
+    const sportsKeywords = [
+      'sport', 'sports', 'football', 'basketball', 'soccer', 'nba', 'nfl', 'mlb', 'nhl', 'tennis', 'golf', 'cricket', 'match', 'game', 'score', 'scores'
+    ]
+    const text = `${name} ${description} ${prompt}`
+
+    // Sports-news: if any sports keyword and any news keyword present
+    if (sportsKeywords.some(k => text.includes(k)) && newsKeywords.some(k => text.includes(k))) {
+      console.log('✅ Detected: sports-news (enhanced)')
+      return 'sports-news'
+    }
+    // General news: if any news keyword present
+    if (newsKeywords.some(k => text.includes(k))) {
+      console.log('✅ Detected: startup-news (enhanced)')
+      return 'startup-news'
+    }
     if (name.includes('startup') || name.includes('news') || prompt.includes('startup news')) {
       console.log('✅ Detected: startup-news')
       return 'startup-news'

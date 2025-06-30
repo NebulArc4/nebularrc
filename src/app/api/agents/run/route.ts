@@ -7,8 +7,8 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
 
-    const run = await agentService.runAgent(agentId, session.user.id)
+    const run = await agentService.runAgent(agentId, user.id)
 
     return NextResponse.json({
       success: true,
@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
 
-    const runs = await agentService.getAgentRuns(agentId, session.user.id, limit)
+    const runs = await agentService.getAgentRuns(agentId, user.id, limit)
 
     return NextResponse.json(runs)
 

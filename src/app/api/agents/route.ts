@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const agents = await agentService.getAgents(session.user.id)
+    const agents = await agentService.getAgents(user.id)
     return NextResponse.json(agents)
 
   } catch (error) {
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name, task prompt, and schedule are required' }, { status: 400 })
     }
 
-    const agent = await agentService.createAgent(session.user.id, {
+    const agent = await agentService.createAgent(user.id, {
       name,
       description: description || '',
       task_prompt,
@@ -66,8 +66,8 @@ export async function PUT(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -78,7 +78,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
 
-    const agent = await agentService.updateAgent(agentId, session.user.id, updates)
+    const agent = await agentService.updateAgent(agentId, user.id, updates)
 
     return NextResponse.json({
       success: true,
@@ -96,8 +96,8 @@ export async function DELETE(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -108,7 +108,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
 
-    await agentService.deleteAgent(agentId, session.user.id)
+    await agentService.deleteAgent(agentId, user.id)
 
     return NextResponse.json({
       success: true,

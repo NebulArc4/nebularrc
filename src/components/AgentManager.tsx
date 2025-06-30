@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Agent, AgentRun } from '@/lib/agent-service'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface AgentTemplate {
   id: string
@@ -35,6 +36,8 @@ export default function AgentManager() {
     model: 'mock-ai-v1',
     complexity: 'medium' as 'low' | 'medium' | 'high'
   })
+
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     fetchAgents()
@@ -171,6 +174,29 @@ export default function AgentManager() {
     }
   }
 
+  // Real-time subscription for agent runs
+  useEffect(() => {
+    if (!selectedAgent) return
+    fetchAgentRuns(selectedAgent.id)
+    const channel = supabase.channel('realtime-agent-runs')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agent_runs',
+          filter: `agent_id=eq.${selectedAgent.id}`
+        },
+        (payload) => {
+          fetchAgentRuns(selectedAgent.id)
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedAgent])
+
   const handleTemplateSelect = (template: AgentTemplate) => {
     setFormData({
       name: template.name,
@@ -247,6 +273,61 @@ export default function AgentManager() {
       
       // Line breaks
       .replace(/\n/g, '<br>')
+  }
+
+  // Helper: Parse news markdown into structured articles
+  function parseNewsMarkdown(markdown: string) {
+    // Detect if it's a news report (sports or startup/tech)
+    const isSports = markdown.startsWith('# 🏈 Sports News Report');
+    const isStartup = markdown.startsWith('# 🚀 Startup & Tech News Report');
+    if (!isSports && !isStartup) return null;
+
+    // Sports news: headlines are like ### 1. [Title](url)\n*Source: Source*\nDescription
+    if (isSports) {
+      const articleRegex = /### (\d+)\. \[(.*?)\]\((.*?)\)\n\*Source: (.*?)\*\n([\s\S]*?)(?=\n###|---|$)/g;
+      const articles = [];
+      let match;
+      while ((match = articleRegex.exec(markdown))) {
+        articles.push({
+          title: match[2],
+          url: match[3],
+          source: match[4],
+          description: match[5]?.trim(),
+          image: null // NewsAPI images not included in markdown, could be added later
+        });
+      }
+      return { type: 'sports', articles };
+    }
+
+    // Startup/tech news: headlines are like ### 1. Title\n**Category:** ... | **Impact:** ...\nSummary\n🔗 [Read Full Story](url)
+    if (isStartup) {
+      const articleRegex = /### (\d+)\. (.*?)\n\*\*Category:\*\* (.*?) \| \*\*Impact:\*\* (.*?)\n([\s\S]*?)\n🔗 \[Read Full Story\]\((.*?)\)\n---/g;
+      const articles = [];
+      let match;
+      while ((match = articleRegex.exec(markdown))) {
+        articles.push({
+          title: match[2],
+          category: match[3],
+          impact: match[4],
+          summary: match[5]?.trim(),
+          url: match[6],
+          image: null // No image in mock data
+        });
+      }
+      return { type: 'startup', articles };
+    }
+    return null;
+  }
+
+  // Helper: Parse agent run result for news-cards
+  function parseAgentRunResult(result: string) {
+    try {
+      const parsed = JSON.parse(result)
+      if (parsed && parsed.type === 'news-cards' && Array.isArray(parsed.articles)) {
+        return parsed
+      }
+    } catch (e) {}
+    return null
   }
 
   if (loading) {
@@ -533,14 +614,38 @@ export default function AgentManager() {
                           {/* Run Content */}
                           <div className="p-4">
                             {run.result ? (
-                              <div className="space-y-3">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span className="text-emerald-300 text-sm font-medium">Task Completed</span>
-                                </div>
-                                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/30">
+                              (() => {
+                                const news = parseAgentRunResult(run.result)
+                                if (news && news.articles.length > 0) {
+                                  return (
+                                    <div className="space-y-4">
+                                      {news.aiSummary && (
+                                        <div className="mb-2 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-blue-200 text-sm font-medium">
+                                          <span className="font-bold text-blue-300">AI Summary:</span> {news.aiSummary}
+                                        </div>
+                                      )}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {news.articles.map((article: any, idx: number) => (
+                                          <div key={idx} className="bg-[#18181b] rounded-xl border border-gray-700/50 shadow-lg overflow-hidden flex flex-col">
+                                            {article.image && (
+                                              <img src={article.image} alt={article.title} className="w-full h-40 object-cover" />
+                                            )}
+                                            <div className="p-4 flex-1 flex flex-col">
+                                              <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">{article.title}</h3>
+                                              {article.source && (
+                                                <div className="text-xs text-gray-400 mb-2">Source: {article.source}</div>
+                                              )}
+                                              <p className="text-gray-300 text-sm mb-3 line-clamp-4">{article.summary}</p>
+                                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="mt-auto inline-block px-3 py-1 bg-[#6366f1] hover:bg-[#8b5cf6] text-white rounded-lg text-xs font-semibold transition-colors">Read More</a>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                // Fallback: render as markdown
+                                return (
                                   <div className="prose prose-invert prose-sm max-w-none">
                                     <div 
                                       className="text-gray-200 leading-relaxed whitespace-pre-wrap"
@@ -549,14 +654,8 @@ export default function AgentManager() {
                                       }}
                                     />
                                   </div>
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-gray-500">
-                                  <span>Execution #{agentRuns.length - index}</span>
-                                  {run.completed_at && (
-                                    <span>Duration: {Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)}s</span>
-                                  )}
-                                </div>
-                              </div>
+                                )
+                              })()
                             ) : run.error_message ? (
                               <div className="space-y-3">
                                 <div className="flex items-center space-x-2 mb-2">

@@ -4,16 +4,15 @@ import { aiService } from '@/lib/ai-service'
 import { mockAIService } from '@/lib/mock-ai-service'
 
 // Choose which AI service to use based on environment
-const useMockAI = !process.env.HUGGINGFACE_API_KEY
-const activeAIService = useMockAI ? mockAIService : aiService
+const activeAIService = aiService
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -42,13 +41,13 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       console.log('POST /api/tasks: No session found')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('POST /api/tasks: Processing request for user:', session.user.id)
+    console.log('POST /api/tasks: Processing request for user:', user.id)
 
     const body = await request.json()
     const { task_prompt, model, category, complexity, estimated_tokens } = body
@@ -63,7 +62,7 @@ export async function POST(request: NextRequest) {
     const { data: task, error: createError } = await supabase
       .from('tasks')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         task_prompt: task_prompt.trim(),
         status: 'pending',
         category: category || 'other',
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
         const aiResponse = await aiService.processTask({
           taskId: task.id,
           prompt: task.task_prompt,
-          userId: session.user.id
+          userId: user.id
         })
 
         console.log('POST /api/tasks: AI processing completed:', aiResponse.status)
@@ -124,7 +123,7 @@ export async function POST(request: NextRequest) {
           .update(updateData)
           .eq('id', task.id)
 
-        console.log(`POST /api/tasks: Task ${task.id} processed successfully with ${aiResponse.model}`)
+        console.log(`POST /api/tasks: Task ${task.id} processed successfully with AI service`)
 
       } catch (processError) {
         console.error('POST /api/tasks: Error processing task:', processError)
@@ -157,8 +156,8 @@ export async function PUT(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -177,7 +176,7 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', taskId)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -202,8 +201,8 @@ export async function DELETE(request: NextRequest) {
     const supabase = getSupabaseServer()
     
     // Verify authentication
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -219,7 +218,7 @@ export async function DELETE(request: NextRequest) {
       .from('tasks')
       .delete()
       .eq('id', taskId)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
 
     if (deleteError) {
       console.error('Error deleting task:', deleteError)
@@ -252,7 +251,7 @@ async function processTaskAsync(taskId: string, prompt: string, userId: string) 
       .eq('id', taskId)
 
     // Process with AI
-    const aiResponse = await activeAIService.processTask({
+    const aiResponse = await aiService.processTask({
       taskId,
       prompt,
       userId
@@ -277,7 +276,7 @@ async function processTaskAsync(taskId: string, prompt: string, userId: string) 
       .update(updateData)
       .eq('id', taskId)
 
-    console.log(`Task ${taskId} processed successfully with ${useMockAI ? 'mock AI' : 'Hugging Face'}`)
+    console.log(`Task ${taskId} processed successfully with AI service`)
 
   } catch (error) {
     console.error(`Error processing task ${taskId}:`, error)

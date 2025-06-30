@@ -1,7 +1,7 @@
 export interface AIModel {
   id: string
   name: string
-  provider: 'huggingface' | 'mock' | 'openai' | 'anthropic'
+  provider: 'mock' | 'openai' | 'anthropic'
   description: string
   maxTokens: number
   costPerToken: number
@@ -20,56 +20,6 @@ export interface ModelPerformance {
 }
 
 export const availableModels: AIModel[] = [
-  // Hugging Face Models
-  {
-    id: 'gpt2',
-    name: 'GPT-2',
-    provider: 'huggingface',
-    description: 'OpenAI\'s GPT-2 model for text generation',
-    maxTokens: 1024,
-    costPerToken: 0.0001,
-    speed: 'fast',
-    quality: 'medium',
-    bestFor: ['text-generation', 'summarization', 'creative-writing'],
-    isAvailable: true
-  },
-  {
-    id: 'distilgpt2',
-    name: 'DistilGPT-2',
-    provider: 'huggingface',
-    description: 'Distilled version of GPT-2, faster and lighter',
-    maxTokens: 1024,
-    costPerToken: 0.00005,
-    speed: 'fast',
-    quality: 'medium',
-    bestFor: ['text-generation', 'quick-responses', 'summarization'],
-    isAvailable: true
-  },
-  {
-    id: 'microsoft/DialoGPT-medium',
-    name: 'DialoGPT Medium',
-    provider: 'huggingface',
-    description: 'Conversational AI model for dialogue generation',
-    maxTokens: 1024,
-    costPerToken: 0.0001,
-    speed: 'medium',
-    quality: 'high',
-    bestFor: ['conversation', 'chat', 'interactive-tasks'],
-    isAvailable: false // Will be checked dynamically
-  },
-  {
-    id: 'microsoft/DialoGPT-large',
-    name: 'DialoGPT Large',
-    provider: 'huggingface',
-    description: 'Large conversational AI model for complex dialogues',
-    maxTokens: 2048,
-    costPerToken: 0.0002,
-    speed: 'slow',
-    quality: 'high',
-    bestFor: ['complex-conversation', 'detailed-analysis', 'creative-writing'],
-    isAvailable: false
-  },
-
   // Mock AI Model
   {
     id: 'mock-ai-v1',

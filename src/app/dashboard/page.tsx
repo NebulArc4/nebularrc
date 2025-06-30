@@ -14,18 +14,24 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage() {
   const supabase = getSupabaseServer()
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect('/auth')
+  // Use getUser() for secure authentication
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    // Should never happen due to middleware, but handle gracefully
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Session Error</h1>
+          <p className="text-red-400">No user session found. Please <a href="/auth" className="underline text-blue-400">log in</a> again.</p>
+        </div>
+      </div>
+    )
   }
-
-  const user = session.user
 
   // Get profile data with error handling
   let profile = null
+  let profileError = null
+  let profileLoading = true
   try {
     const { data: profileData } = await supabase
       .from('profiles')
@@ -33,8 +39,10 @@ export default async function DashboardPage() {
       .eq('id', user.id)
       .single()
     profile = profileData
+    profileLoading = false
   } catch (error) {
-    console.log('Profile not found, using default values')
+    profileError = error
+    profileLoading = false
   }
 
   // Get task statistics with error handling
@@ -44,21 +52,23 @@ export default async function DashboardPage() {
     completed: 0,
     inProgress: 0,
   }
-
+  let tasksError = null
+  let tasksLoading = true
   try {
     const { data: tasks } = await supabase
       .from('tasks')
       .select('status')
       .eq('user_id', user.id)
-
     taskStats = {
       total: tasks?.length || 0,
       pending: tasks?.filter(t => t.status === 'pending').length || 0,
       completed: tasks?.filter(t => t.status === 'completed').length || 0,
       inProgress: tasks?.filter(t => t.status === 'in_progress').length || 0,
     }
+    tasksLoading = false
   } catch (error) {
-    console.log('Error fetching tasks:', error)
+    tasksError = error
+    tasksLoading = false
   }
 
   // Get user's display name
@@ -112,7 +122,13 @@ export default async function DashboardPage() {
                 <p className="text-gray-400 text-base">
                   Ready to tackle your next AI-powered task?
                 </p>
-                {profile?.role && (
+                {profileLoading && (
+                  <div className="mt-2 text-sm text-blue-400">Loading profile...</div>
+                )}
+                {profileError && (
+                  <div className="mt-2 text-sm text-red-400">Error loading profile.</div>
+                )}
+                {profile?.role && !profileLoading && (
                   <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-[#6366f1]/10 text-[#6366f1] border border-[#6366f1]/20">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -123,7 +139,13 @@ export default async function DashboardPage() {
               </div>
 
               {/* Stats Cards */}
-              <DashboardStats stats={taskStats} />
+              {tasksLoading ? (
+                <div className="mb-8 text-blue-400">Loading tasks...</div>
+              ) : tasksError ? (
+                <div className="mb-8 text-red-400">Error loading tasks.</div>
+              ) : (
+                <DashboardStats stats={taskStats} />
+              )}
 
               {/* Main Content Grid - Task Submission and Task List */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

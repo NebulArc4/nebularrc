@@ -1,17 +1,11 @@
-import { HfInference } from '@huggingface/inference'
 import { mockAIService } from './mock-ai-service'
-import { InferenceClient } from "@huggingface/inference";
-
-// Initialize AI clients
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
-const hfClient = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
 
 export interface AITaskRequest {
   taskId: string
   prompt: string
   userId: string
   model?: string
-  provider?: 'openai' | 'anthropic' | 'google' | 'huggingface' | 'mock'
+  provider?: 'openai' | 'anthropic' | 'google' | 'mock'
 }
 
 export interface AITaskResponse {
@@ -30,12 +24,10 @@ export class AIService {
     openai: boolean
     anthropic: boolean
     google: boolean
-    huggingface: boolean
   } = {
     openai: false,
     anthropic: false,
     google: false,
-    huggingface: false
   }
 
   private constructor() {
@@ -68,27 +60,6 @@ export class AIService {
       console.log('✅ Google AI API available')
     }
 
-    // Check Hugging Face (chatCompletion)
-    if (process.env.HUGGINGFACE_API_KEY) {
-      try {
-        const chatCompletion = await hfClient.chatCompletion({
-          provider: 'featherless-ai',
-          model: 'Menlo/Jan-nano-128k',
-          messages: [
-            { role: 'user', content: 'Hello!' }
-          ]
-        })
-        if (chatCompletion.choices && chatCompletion.choices.length > 0) {
-          this.providers.huggingface = true
-          console.log('✅ Hugging Face chatCompletion API available')
-        } else {
-          throw new Error('No choices returned')
-        }
-      } catch (error) {
-        console.log('❌ Hugging Face chatCompletion API not available:', error)
-      }
-    }
-
     console.log('Available AI providers:', this.providers)
   }
 
@@ -105,8 +76,6 @@ export class AIService {
           return await this.processWithAnthropic(request)
         case 'google':
           return await this.processWithGoogle(request)
-        case 'huggingface':
-          return await this.processWithHuggingFace(request)
         case 'mock':
         default:
           return await this.processWithMock(request)
@@ -121,28 +90,20 @@ export class AIService {
   private getBestProvider(prompt: string): string {
     // Determine best provider based on prompt content
     const promptLower = prompt.toLowerCase()
-    
-    // Prioritize Hugging Face since it's already configured
-    if (this.providers.huggingface) {
-      return 'huggingface'
+    // Prefer Google Gemini if available
+    if (this.providers.google) {
+      return 'google'
     }
-    
     if (this.providers.openai && (promptLower.includes('analysis') || promptLower.includes('research'))) {
       return 'openai'
     }
     if (this.providers.anthropic && (promptLower.includes('safety') || promptLower.includes('ethical'))) {
       return 'anthropic'
     }
-    if (this.providers.google && (promptLower.includes('multimodal') || promptLower.includes('vision'))) {
-      return 'google'
-    }
-    
     // Return first available provider
     if (this.providers.openai) return 'openai'
     if (this.providers.anthropic) return 'anthropic'
     if (this.providers.google) return 'google'
-    if (this.providers.huggingface) return 'huggingface'
-    
     return 'mock'
   }
 
@@ -276,41 +237,6 @@ export class AIService {
     }
   }
 
-  private async processWithHuggingFace(request: AITaskRequest): Promise<AITaskResponse> {
-    if (!this.providers.huggingface) {
-      throw new Error('Hugging Face not available')
-    }
-
-    // Use Featherless/Jan-nano-128k as the default chat model
-    const provider = 'featherless-ai'
-    const model = 'Menlo/Jan-nano-128k'
-    
-    console.log(`Processing with Hugging Face chatCompletion: provider=${provider}, model=${model}`)
-
-    try {
-      const chatCompletion = await hfClient.chatCompletion({
-        provider,
-        model,
-        messages: [
-          { role: 'user', content: request.prompt }
-        ]
-      })
-      const result = chatCompletion.choices?.[0]?.message?.content || 'No response generated'
-
-      return {
-        taskId: request.taskId,
-        result,
-        status: 'completed',
-        model: model,
-        provider: 'huggingface',
-        tokensUsed: result.length
-      }
-    } catch (error) {
-      console.error(`Hugging Face chatCompletion API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      throw error
-    }
-  }
-
   private async processWithMock(request: AITaskRequest): Promise<AITaskResponse> {
     console.log(`Processing task ${request.taskId} with mock AI`)
     const mockResponse = await mockAIService.processTask(request)
@@ -324,7 +250,7 @@ export class AIService {
     console.log(`Provider ${failedProvider} failed, trying fallback...`)
     
     // Try other providers in order of preference
-    const fallbackOrder = ['openai', 'anthropic', 'google', 'huggingface', 'mock']
+    const fallbackOrder = ['openai', 'anthropic', 'google', 'mock']
     const startIndex = fallbackOrder.indexOf(failedProvider) + 1
     
     for (let i = startIndex; i < fallbackOrder.length; i++) {
@@ -384,10 +310,7 @@ export class AIService {
       let suggestedProvider = 'mock'
       let suggestedModel = 'mock-ai-v1'
 
-      if (this.providers.huggingface) {
-        suggestedProvider = 'huggingface'
-        suggestedModel = 'gpt2'
-      } else if (this.providers.openai) {
+      if (this.providers.openai) {
         suggestedProvider = 'openai'
         suggestedModel = complexity === 'high' ? 'gpt-4' : 'gpt-3.5-turbo'
       } else if (this.providers.anthropic) {
@@ -422,7 +345,6 @@ export class AIService {
     if (this.providers.openai) available.push('openai')
     if (this.providers.anthropic) available.push('anthropic')
     if (this.providers.google) available.push('google')
-    if (this.providers.huggingface) available.push('huggingface')
     if (available.length === 0) available.push('mock')
     return available
   }
@@ -431,16 +353,5 @@ export class AIService {
 export const aiService = AIService.getInstance()
 
 export async function runChatCompletion(prompt: string) {
-  const chatCompletion = await hfClient.chatCompletion({
-    provider: "featherless-ai",
-    model: "Menlo/Jan-nano-128k",
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
-
-  return chatCompletion.choices[0].message.content;
+  // ... existing code ...
 } 

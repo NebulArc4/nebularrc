@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface Task {
   id: string
@@ -20,6 +21,7 @@ export default function TaskList({ userId }: { userId: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const supabase = createClientComponentClient()
 
   const fetchTasks = async () => {
     try {
@@ -39,13 +41,27 @@ export default function TaskList({ userId }: { userId: string }) {
   useEffect(() => {
     fetchTasks()
     
-    // Set up polling for task updates
-    const interval = setInterval(() => {
-      setRefreshing(true)
-      fetchTasks()
-    }, 5000) // Poll every 5 seconds
+    // Set up Supabase real-time subscription for this user's tasks
+    const channel = supabase.channel('realtime-tasks')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          // On any change, re-fetch tasks
+          setRefreshing(true)
+          fetchTasks()
+        }
+      )
+      .subscribe()
 
-    return () => clearInterval(interval)
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [userId])
 
   const getStatusColor = (status: string) => {
