@@ -66,20 +66,30 @@ export class AIService {
       console.log('✅ Google AI API available')
     }
 
-    // Check Hugging Face
+    // Check Hugging Face (Zephyr-7B-Beta, conversational)
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
-        await (hf as any).conversational({
-          model: 'HuggingFaceH4/zephyr-7b-beta',
-          inputs: {
-            text: 'test',
-            past_user_inputs: [],
-            generated_responses: []
+        const response = await fetch('https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            'Content-Type': 'application/json'
           },
-          parameters: { max_new_tokens: 1 }
+          body: JSON.stringify({
+            inputs: {
+              past_user_inputs: [],
+              generated_responses: [],
+              text: 'test'
+            },
+            parameters: { max_new_tokens: 1 }
+          })
         })
-        this.providers.huggingface = true
-        console.log('✅ Hugging Face API available')
+        if (response.ok) {
+          this.providers.huggingface = true
+          console.log('✅ Hugging Face API available')
+        } else {
+          throw new Error(`Status ${response.status}`)
+        }
       } catch (error) {
         console.log('❌ Hugging Face API not available:', error)
       }
@@ -283,21 +293,30 @@ export class AIService {
     console.log(`Processing with Hugging Face model: ${model}`)
 
     try {
-      const response = await (hf as any).conversational({
-        model: model,
-        inputs: {
-          text: request.prompt,
-          past_user_inputs: [],
-          generated_responses: []
+      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          'Content-Type': 'application/json'
         },
-        parameters: {
-          max_new_tokens: 500,
-          temperature: 0.7,
-          do_sample: true
-        }
+        body: JSON.stringify({
+          inputs: {
+            past_user_inputs: [],
+            generated_responses: [],
+            text: request.prompt
+          },
+          parameters: {
+            max_new_tokens: 500,
+            temperature: 0.7,
+            do_sample: true
+          }
+        })
       })
-
-      const result = response.generated_text || 'No response generated'
+      if (!response.ok) {
+        throw new Error(`Hugging Face API error: ${response.status}`)
+      }
+      const data = await response.json()
+      const result = data.generated_text || (data.generated_responses && data.generated_responses[0]) || 'No response generated'
 
       return {
         taskId: request.taskId,
