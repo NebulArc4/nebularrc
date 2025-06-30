@@ -70,7 +70,7 @@ export class AIService {
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
         await hf.textGeneration({
-          model: 'distilgpt2',
+          model: 'deepseek-ai/DeepSeek-R1-0528',
           inputs: 'test',
           parameters: { max_new_tokens: 1, return_full_text: false }
         })
