@@ -1,5 +1,6 @@
 import { getSupabaseServer } from './supabase-server'
 import { aiService } from './ai-service'
+import { createClient } from '@supabase/supabase-js'
 
 export interface Agent {
   id: string
@@ -228,42 +229,59 @@ export class AgentService {
   }
 
   private async executeSpecializedAgentTask(agent: Agent, taskId: string, userId: string): Promise<any> {
-    // Determine agent type and execute specialized logic
     const agentType = this.determineAgentType(agent)
     
-    console.log(`🔍 Agent Type Detection:`, {
-      agentName: agent.name,
-      agentDescription: agent.description,
-      agentPrompt: agent.task_prompt,
-      detectedType: agentType
-    })
+    console.log(`🤖 Executing specialized agent: ${agentType}`)
     
-    switch (agentType) {
-      case 'startup-news':
-        console.log('🚀 Executing Startup News Agent')
-        return await this.executeStartupNewsAgent(agent, taskId, userId)
-      case 'market-analysis':
-        console.log('📊 Executing Market Analysis Agent')
-        return await this.executeMarketAnalysisAgent(agent, taskId, userId)
-      case 'competitor-monitor':
-        console.log('🕵️ Executing Competitor Monitor Agent')
-        return await this.executeCompetitorMonitorAgent(agent, taskId, userId)
-      case 'content-curator':
-        console.log('📚 Executing Content Curator Agent')
-        return await this.executeContentCuratorAgent(agent, taskId, userId)
-      case 'social-media-monitor':
-        console.log('📱 Executing Social Media Monitor Agent')
-        return await this.executeSocialMediaMonitorAgent(agent, taskId, userId)
-      case 'sports-news':
-        console.log('🏈 Executing Sports News Agent')
-        return await this.executeSportsNewsAgent(agent, taskId, userId)
-      default:
-        console.log('🤖 Executing Generic AI Service')
-        return await aiService.processTask({
-          taskId,
-          prompt: agent.task_prompt,
-          userId: userId
-        })
+    // Use real AI for specialized agents instead of mock data
+    try {
+      const aiResponse = await aiService.processTask({
+        taskId,
+        prompt: agent.task_prompt,
+        userId: userId,
+        provider: 'openai' // Start with OpenAI for best results
+      })
+      
+      return {
+        taskId,
+        result: aiResponse.result,
+        status: 'completed',
+        model: aiResponse.model,
+        provider: aiResponse.provider,
+        tokensUsed: aiResponse.tokensUsed
+      }
+    } catch (error) {
+      console.error(`Error with real AI for ${agentType}:`, error)
+      
+      // Fallback to mock data if real AI fails
+      switch (agentType) {
+        case 'startup-news':
+          console.log('📰 Executing Startup News Agent (fallback)')
+          return await this.executeStartupNewsAgent(agent, taskId, userId)
+        case 'market-analysis':
+          console.log('📊 Executing Market Analysis Agent (fallback)')
+          return await this.executeMarketAnalysisAgent(agent, taskId, userId)
+        case 'competitor-monitor':
+          console.log('🕵️ Executing Competitor Monitor Agent (fallback)')
+          return await this.executeCompetitorMonitorAgent(agent, taskId, userId)
+        case 'content-curator':
+          console.log('📝 Executing Content Curator Agent (fallback)')
+          return await this.executeContentCuratorAgent(agent, taskId, userId)
+        case 'social-media-monitor':
+          console.log('📱 Executing Social Media Monitor Agent (fallback)')
+          return await this.executeSocialMediaMonitorAgent(agent, taskId, userId)
+        case 'sports-news':
+          console.log('🏈 Executing Sports News Agent (fallback)')
+          return await this.executeSportsNewsAgent(agent, taskId, userId)
+        default:
+          console.log('🤖 Executing Generic AI Service (fallback)')
+          return await aiService.processTask({
+            taskId,
+            prompt: agent.task_prompt,
+            userId: userId,
+            provider: 'mock'
+          })
+      }
     }
   }
 

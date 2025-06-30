@@ -1,7 +1,7 @@
 import { HfInference } from '@huggingface/inference'
 import { mockAIService } from './mock-ai-service'
 
-// Initialize Hugging Face client
+// Initialize AI clients
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
 
 export interface AITaskRequest {
@@ -9,6 +9,7 @@ export interface AITaskRequest {
   prompt: string
   userId: string
   model?: string
+  provider?: 'openai' | 'anthropic' | 'google' | 'huggingface' | 'mock'
 }
 
 export interface AITaskResponse {
@@ -17,15 +18,26 @@ export interface AITaskResponse {
   status: 'completed' | 'failed'
   error?: string
   model: string
+  provider: string
   tokensUsed?: number
 }
 
 export class AIService {
   private static instance: AIService
-  private hfAvailable: boolean = false
+  private providers: {
+    openai: boolean
+    anthropic: boolean
+    google: boolean
+    huggingface: boolean
+  } = {
+    openai: false,
+    anthropic: false,
+    google: false,
+    huggingface: false
+  }
 
   private constructor() {
-    this.checkHFAvailability()
+    this.checkProviderAvailability()
   }
 
   public static getInstance(): AIService {
@@ -35,81 +47,284 @@ export class AIService {
     return AIService.instance
   }
 
-  private async checkHFAvailability() {
-    try {
-      // Test with a simple model to check if HF is available
-      const response = await hf.textGeneration({
-        model: 'distilgpt2',
-        inputs: 'test',
-        parameters: {
-          max_new_tokens: 1,
-          return_full_text: false
-        }
-      })
-      this.hfAvailable = true
-      console.log('Hugging Face is available')
-    } catch (error) {
-      this.hfAvailable = false
-      console.log('Hugging Face not available, using mock AI:', error)
+  private async checkProviderAvailability() {
+    // Check OpenAI
+    if (process.env.OPENAI_API_KEY) {
+      this.providers.openai = true
+      console.log('✅ OpenAI API available')
     }
+
+    // Check Anthropic
+    if (process.env.ANTHROPIC_API_KEY) {
+      this.providers.anthropic = true
+      console.log('✅ Anthropic API available')
+    }
+
+    // Check Google
+    if (process.env.GOOGLE_AI_API_KEY) {
+      this.providers.google = true
+      console.log('✅ Google AI API available')
+    }
+
+    // Check Hugging Face
+    if (process.env.HUGGINGFACE_API_KEY) {
+      try {
+        await hf.textGeneration({
+          model: 'distilgpt2',
+          inputs: 'test',
+          parameters: { max_new_tokens: 1, return_full_text: false }
+        })
+        this.providers.huggingface = true
+        console.log('✅ Hugging Face API available')
+      } catch (error) {
+        console.log('❌ Hugging Face API not available:', error)
+      }
+    }
+
+    console.log('Available AI providers:', this.providers)
   }
 
   async processTask(request: AITaskRequest): Promise<AITaskResponse> {
-    // If HF is not available, use mock AI
-    if (!this.hfAvailable) {
-      console.log(`Processing task ${request.taskId} with mock AI (HF not available)`)
-      return await mockAIService.processTask(request)
-    }
+    const provider = request.provider || this.getBestProvider(request.prompt)
+    
+    console.log(`Processing task ${request.taskId} with provider: ${provider}`)
 
     try {
-      // Use reliable, always-available models
-      const model = request.model || 'distilgpt2'
-      
-      console.log(`Processing task ${request.taskId} with Hugging Face model ${model}`)
-      
-      // For text generation tasks, we'll use a conversational approach
-      const systemPrompt = `You are NebulArc, an advanced AI assistant specialized in autonomous decision-making, research, and strategy. 
-      Provide comprehensive, well-structured responses that are actionable and insightful.
-      Always maintain a professional tone and focus on delivering value.`
-      
-      const fullPrompt = `${systemPrompt}\n\nUser: ${request.prompt}\nNebulArc:`
-      
-      const response = await hf.textGeneration({
-        model: model,
-        inputs: fullPrompt,
-        parameters: {
-          max_new_tokens: 500,
-          temperature: 0.7,
-          do_sample: true,
-          return_full_text: false
+      switch (provider) {
+        case 'openai':
+          return await this.processWithOpenAI(request)
+        case 'anthropic':
+          return await this.processWithAnthropic(request)
+        case 'google':
+          return await this.processWithGoogle(request)
+        case 'huggingface':
+          return await this.processWithHuggingFace(request)
+        case 'mock':
+        default:
+          return await this.processWithMock(request)
+      }
+    } catch (error) {
+      console.error(`Error with provider ${provider}:`, error)
+      // Fallback to next available provider
+      return await this.processWithFallback(request, provider)
+    }
+  }
+
+  private getBestProvider(prompt: string): string {
+    // Determine best provider based on prompt content
+    const promptLower = prompt.toLowerCase()
+    
+    if (this.providers.openai && (promptLower.includes('analysis') || promptLower.includes('research'))) {
+      return 'openai'
+    }
+    if (this.providers.anthropic && (promptLower.includes('safety') || promptLower.includes('ethical'))) {
+      return 'anthropic'
+    }
+    if (this.providers.google && (promptLower.includes('multimodal') || promptLower.includes('vision'))) {
+      return 'google'
+    }
+    if (this.providers.huggingface) {
+      return 'huggingface'
+    }
+    
+    // Return first available provider
+    if (this.providers.openai) return 'openai'
+    if (this.providers.anthropic) return 'anthropic'
+    if (this.providers.google) return 'google'
+    if (this.providers.huggingface) return 'huggingface'
+    
+    return 'mock'
+  }
+
+  private async processWithOpenAI(request: AITaskRequest): Promise<AITaskResponse> {
+    if (!this.providers.openai) {
+      throw new Error('OpenAI not available')
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: request.model || 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are NebulArc, an advanced AI assistant specialized in autonomous decision-making, research, and strategy. Provide comprehensive, well-structured responses that are actionable and insightful. Always maintain a professional tone and focus on delivering value.'
+          },
+          {
+            role: 'user',
+            content: request.prompt
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.7
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const result = data.choices[0]?.message?.content || 'No response generated'
+
+    return {
+      taskId: request.taskId,
+      result,
+      status: 'completed',
+      model: request.model || 'gpt-4',
+      provider: 'openai',
+      tokensUsed: data.usage?.total_tokens
+    }
+  }
+
+  private async processWithAnthropic(request: AITaskRequest): Promise<AITaskResponse> {
+    if (!this.providers.anthropic) {
+      throw new Error('Anthropic not available')
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.ANTHROPIC_API_KEY}`,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: request.model || 'claude-3-sonnet-20240229',
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: request.prompt
+          }
+        ]
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const result = data.content[0]?.text || 'No response generated'
+
+    return {
+      taskId: request.taskId,
+      result,
+      status: 'completed',
+      model: request.model || 'claude-3-sonnet-20240229',
+      provider: 'anthropic',
+      tokensUsed: data.usage?.input_tokens + data.usage?.output_tokens
+    }
+  }
+
+  private async processWithGoogle(request: AITaskRequest): Promise<AITaskResponse> {
+    if (!this.providers.google) {
+      throw new Error('Google AI not available')
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${request.model || 'gemini-pro'}:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: request.prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: 2000,
+          temperature: 0.7
         }
       })
+    })
 
-      const result = response.generated_text || 'No response generated'
+    if (!response.ok) {
+      throw new Error(`Google AI API error: ${response.status}`)
+    }
 
-      return {
-        taskId: request.taskId,
-        result,
-        status: 'completed',
-        model,
-        tokensUsed: result.length // Approximate token count
+    const data = await response.json()
+    const result = data.candidates[0]?.content?.parts[0]?.text || 'No response generated'
+
+    return {
+      taskId: request.taskId,
+      result,
+      status: 'completed',
+      model: request.model || 'gemini-pro',
+      provider: 'google',
+      tokensUsed: result.length // Approximate
+    }
+  }
+
+  private async processWithHuggingFace(request: AITaskRequest): Promise<AITaskResponse> {
+    if (!this.providers.huggingface) {
+      throw new Error('Hugging Face not available')
+    }
+
+    const response = await hf.textGeneration({
+      model: request.model || 'distilgpt2',
+      inputs: request.prompt,
+      parameters: {
+        max_new_tokens: 500,
+        temperature: 0.7,
+        do_sample: true,
+        return_full_text: false
       }
+    })
 
-    } catch (error) {
-      console.error(`Error processing task ${request.taskId} with Hugging Face:`, error)
-      
-      // Try alternative model if first one fails
-      try {
-        console.log(`Trying alternative Hugging Face model for task ${request.taskId}`)
-        return await this.processTaskWithAlternative(request)
-      } catch (fallbackError) {
-        console.error(`Hugging Face fallback also failed for task ${request.taskId}:`, fallbackError)
-        
-        // Fall back to mock AI
-        console.log(`Falling back to mock AI for task ${request.taskId}`)
-        return await mockAIService.processTask(request)
+    const result = response.generated_text || 'No response generated'
+
+    return {
+      taskId: request.taskId,
+      result,
+      status: 'completed',
+      model: request.model || 'distilgpt2',
+      provider: 'huggingface',
+      tokensUsed: result.length
+    }
+  }
+
+  private async processWithMock(request: AITaskRequest): Promise<AITaskResponse> {
+    console.log(`Processing task ${request.taskId} with mock AI`)
+    const mockResponse = await mockAIService.processTask(request)
+    return {
+      ...mockResponse,
+      provider: 'mock'
+    }
+  }
+
+  private async processWithFallback(request: AITaskRequest, failedProvider: string): Promise<AITaskResponse> {
+    console.log(`Provider ${failedProvider} failed, trying fallback...`)
+    
+    // Try other providers in order of preference
+    const fallbackOrder = ['openai', 'anthropic', 'google', 'huggingface', 'mock']
+    const startIndex = fallbackOrder.indexOf(failedProvider) + 1
+    
+    for (let i = startIndex; i < fallbackOrder.length; i++) {
+      const provider = fallbackOrder[i]
+      if (this.providers[provider as keyof typeof this.providers] || provider === 'mock') {
+        try {
+          console.log(`Trying fallback provider: ${provider}`)
+          return await this.processTask({ ...request, provider: provider as any })
+        } catch (error) {
+          console.error(`Fallback provider ${provider} also failed:`, error)
+          continue
+        }
       }
     }
+    
+    // If all providers fail, use mock
+    return await this.processWithMock(request)
   }
 
   async analyzeTask(prompt: string): Promise<{
@@ -117,9 +332,9 @@ export class AIService {
     complexity: 'low' | 'medium' | 'high'
     estimatedTokens: number
     suggestedModel: string
+    suggestedProvider: string
   }> {
     try {
-      // Simple rule-based analysis since we can't use AI for this
       const words = prompt.toLowerCase().split(' ')
       
       // Category detection
@@ -148,14 +363,30 @@ export class AIService {
       // Token estimation
       const estimatedTokens = Math.ceil(wordCount * 1.3)
 
-      // Model suggestion - use reliable models
-      const suggestedModel = this.hfAvailable ? 'distilgpt2' : 'mock-ai-v1'
+      // Provider and model suggestion
+      let suggestedProvider = 'mock'
+      let suggestedModel = 'mock-ai-v1'
+
+      if (this.providers.openai) {
+        suggestedProvider = 'openai'
+        suggestedModel = complexity === 'high' ? 'gpt-4' : 'gpt-3.5-turbo'
+      } else if (this.providers.anthropic) {
+        suggestedProvider = 'anthropic'
+        suggestedModel = 'claude-3-sonnet-20240229'
+      } else if (this.providers.google) {
+        suggestedProvider = 'google'
+        suggestedModel = 'gemini-pro'
+      } else if (this.providers.huggingface) {
+        suggestedProvider = 'huggingface'
+        suggestedModel = 'distilgpt2'
+      }
 
       return {
         category,
         complexity,
         estimatedTokens,
-        suggestedModel
+        suggestedModel,
+        suggestedProvider
       }
     } catch (error) {
       console.error('Error analyzing task:', error)
@@ -163,51 +394,20 @@ export class AIService {
         category: 'other',
         complexity: 'medium',
         estimatedTokens: 1000,
-        suggestedModel: this.hfAvailable ? 'distilgpt2' : 'mock-ai-v1'
+        suggestedModel: 'mock-ai-v1',
+        suggestedProvider: 'mock'
       }
     }
   }
 
-  // Alternative method using a different free model
-  async processTaskWithAlternative(request: AITaskRequest): Promise<AITaskResponse> {
-    try {
-      // Use a different free model as fallback
-      const model = 'gpt2' // Alternative model
-      
-      console.log(`Processing task ${request.taskId} with alternative Hugging Face model ${model}`)
-      
-      const response = await hf.textGeneration({
-        model: model,
-        inputs: request.prompt,
-        parameters: {
-          max_new_tokens: 300,
-          temperature: 0.8,
-          do_sample: true,
-          return_full_text: false
-        }
-      })
-
-      const result = response.generated_text || 'No response generated'
-
-      return {
-        taskId: request.taskId,
-        result,
-        status: 'completed',
-        model,
-        tokensUsed: result.length
-      }
-
-    } catch (error) {
-      console.error(`Error processing task ${request.taskId} with alternative model:`, error)
-      
-      return {
-        taskId: request.taskId,
-        result: '',
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        model: 'gpt2'
-      }
-    }
+  getAvailableProviders(): string[] {
+    const available = []
+    if (this.providers.openai) available.push('openai')
+    if (this.providers.anthropic) available.push('anthropic')
+    if (this.providers.google) available.push('google')
+    if (this.providers.huggingface) available.push('huggingface')
+    if (available.length === 0) available.push('mock')
+    return available
   }
 }
 
