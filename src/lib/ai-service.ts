@@ -66,10 +66,10 @@ export class AIService {
       console.log('✅ Google AI API available')
     }
 
-    // Check Hugging Face (DialoGPT-medium, text-generation)
+    // Check Hugging Face (gpt2, text-generation)
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
-        const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+        const response = await fetch('https://api-inference.huggingface.co/models/gpt2', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
@@ -283,8 +283,8 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    // Use DialoGPT-medium as the default model with text-generation API
-    const model = request.model || 'microsoft/DialoGPT-medium'
+    // Use gpt2 as the default model with text-generation API
+    const model = request.model || 'gpt2'
     
     console.log(`Processing with Hugging Face model: ${model}`)
 
@@ -400,7 +400,7 @@ export class AIService {
 
       if (this.providers.huggingface) {
         suggestedProvider = 'huggingface'
-        suggestedModel = 'microsoft/DialoGPT-medium'
+        suggestedModel = 'gpt2'
       } else if (this.providers.openai) {
         suggestedProvider = 'openai'
         suggestedModel = complexity === 'high' ? 'gpt-4' : 'gpt-3.5-turbo'
