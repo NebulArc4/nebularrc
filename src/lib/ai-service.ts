@@ -273,8 +273,8 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    // Use a reliable model that works with text generation
-    const model = request.model || 'gpt2' // Fallback to gpt2 which is always available
+    // Use DeepSeek-R1-0528 as the default model
+    const model = request.model || 'deepseek-ai/DeepSeek-R1-0528'
     
     console.log(`Processing with Hugging Face model: ${model}`)
 
