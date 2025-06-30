@@ -21,18 +21,18 @@ export interface ModelPerformance {
 
 export const availableModels: AIModel[] = [
   // Mock AI Model
-  {
-    id: 'mock-ai-v1',
-    name: 'Mock AI v1',
-    provider: 'mock',
-    description: 'Local mock AI for testing and development',
-    maxTokens: 1000,
-    costPerToken: 0,
-    speed: 'fast',
-    quality: 'medium',
-    bestFor: ['testing', 'development', 'prototyping'],
-    isAvailable: true
-  }
+  // {
+  //   id: 'mock-ai-v1',
+  //   name: 'Mock AI v1',
+  //   provider: 'mock',
+  //   description: 'Local mock AI for testing and development',
+  //   maxTokens: 1000,
+  //   costPerToken: 0,
+  //   speed: 'fast',
+  //   quality: 'medium',
+  //   bestFor: ['testing', 'development', 'prototyping'],
+  //   isAvailable: true
+  // }
 ]
 
 export class ModelManager {
