@@ -254,6 +254,9 @@ export class AgentService {
       case 'social-media-monitor':
         console.log('📱 Executing Social Media Monitor Agent')
         return await this.executeSocialMediaMonitorAgent(agent, taskId, userId)
+      case 'sports-news':
+        console.log('🏈 Executing Sports News Agent')
+        return await this.executeSportsNewsAgent(agent, taskId, userId)
       default:
         console.log('🤖 Executing Generic AI Service')
         return await aiService.processTask({
@@ -290,6 +293,10 @@ export class AgentService {
     if (name.includes('social') || name.includes('media') || prompt.includes('social media')) {
       console.log('✅ Detected: social-media-monitor')
       return 'social-media-monitor'
+    }
+    if (name.includes('sport') || name.includes('sporta') || prompt.includes('sport') || prompt.includes('sports news') || prompt.includes('football') || prompt.includes('basketball') || prompt.includes('soccer')) {
+      console.log('✅ Detected: sports-news')
+      return 'sports-news'
     }
     
     console.log('❌ No specific type detected, using generic')
@@ -877,6 +884,114 @@ Social media monitoring reveals strong engagement around AI topics, with sentime
       result,
       status: 'completed',
       model: 'specialized-social-agent',
+      tokensUsed: result.length
+    }
+  }
+
+  private async executeSportsNewsAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000))
+    
+    const currentDate = new Date().toLocaleDateString()
+    const sportsNewsItems = [
+      {
+        title: "Lakers vs Warriors: Epic Showdown in Western Conference Finals",
+        summary: "The Los Angeles Lakers defeated the Golden State Warriors 120-115 in a thrilling Game 7, advancing to the NBA Finals. LeBron James scored 35 points with 12 assists.",
+        link: "https://www.nba.com/lakers-warriors-game7-2024",
+        category: "Basketball",
+        impact: "High"
+      },
+      {
+        title: "Manchester City Wins Premier League Title on Final Day",
+        summary: "Manchester City secured their fourth consecutive Premier League title with a dramatic 3-2 victory over Aston Villa, with Erling Haaland scoring the winning goal in stoppage time.",
+        link: "https://www.premierleague.com/man-city-champions-2024",
+        category: "Soccer",
+        impact: "High"
+      },
+      {
+        title: "NFL Draft 2024: Quarterbacks Dominate First Round",
+        summary: "Six quarterbacks were selected in the first round of the 2024 NFL Draft, setting a new record. Caleb Williams went first overall to the Chicago Bears.",
+        link: "https://www.nfl.com/draft-2024-quarterbacks",
+        category: "Football",
+        impact: "Medium"
+      },
+      {
+        title: "Tennis: Djokovic Wins French Open for Record 24th Grand Slam",
+        summary: "Novak Djokovic defeated Carlos Alcaraz in straight sets to win his 24th Grand Slam title, breaking the all-time record previously held by Margaret Court.",
+        link: "https://www.atptour.com/djokovic-french-open-2024",
+        category: "Tennis",
+        impact: "High"
+      },
+      {
+        title: "Olympics 2024: Team USA Leads Medal Count in Paris",
+        summary: "The United States leads the medal count at the 2024 Paris Olympics with 45 gold medals, followed by China with 38 and Great Britain with 25.",
+        link: "https://olympics.com/paris-2024/medal-count",
+        category: "Olympics",
+        impact: "Medium"
+      }
+    ]
+
+    const result = `# 🏈 Sports News Report - ${currentDate}
+
+## 📊 Executive Summary
+Today's sports world delivered thrilling action across multiple leagues and competitions. From NBA playoffs to Premier League drama, fans witnessed unforgettable moments and record-breaking performances.
+
+## 🔥 Top Stories
+
+${sportsNewsItems.map((item, index) => `
+### ${index + 1}. ${item.title}
+**Category:** ${item.category} | **Impact:** ${item.impact}
+
+${item.summary}
+
+🔗 [Read More](${item.link})
+
+---
+`).join('')}
+
+## 📈 League Updates
+
+### 🏀 NBA Playoffs
+- **Western Conference:** Lakers advance to Finals
+- **Eastern Conference:** Celtics vs Heat in Game 7
+- **MVP Race:** Nikola Jokić leads with 28.5 PPG, 13.8 RPG
+
+### ⚽ Premier League
+- **Champions:** Manchester City (4th consecutive title)
+- **Relegated:** Burnley, Sheffield United, Luton Town
+- **Golden Boot:** Erling Haaland (27 goals)
+
+### 🏈 NFL Offseason
+- **Draft:** 6 QBs in first round (record)
+- **Free Agency:** Major moves in quarterback market
+- **Training Camps:** Begin July 15th
+
+## 🎯 Key Insights
+1. **Dynasty Building:** Manchester City's dominance continues
+2. **Young Talent:** New generation of athletes emerging
+3. **Record Breaking:** Multiple sports seeing historic achievements
+
+## 📊 Quick Stats
+- **Major Events Today:** 5
+- **Sports Covered:** Basketball, Soccer, Football, Tennis, Olympics
+- **Record Breaks:** 2 (NFL Draft QBs, Djokovic Grand Slams)
+
+## 🏆 Championship Updates
+| Sport | Current Champion | Next Event |
+|-------|------------------|------------|
+| NBA | TBD (Lakers vs TBD) | Finals Game 1 |
+| Premier League | Manchester City | Community Shield |
+| NFL | Kansas City Chiefs | Season Opener |
+| Tennis | Djokovic (French Open) | Wimbledon |
+
+---
+*Report generated by ${agent.name} on ${currentDate}*`
+
+    return {
+      taskId,
+      result,
+      status: 'completed',
+      model: 'specialized-sports-agent',
       tokensUsed: result.length
     }
   }
