@@ -1,8 +1,10 @@
 import { HfInference } from '@huggingface/inference'
 import { mockAIService } from './mock-ai-service'
+import { InferenceClient } from "@huggingface/inference";
 
 // Initialize AI clients
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
+const hfClient = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
 
 export interface AITaskRequest {
   taskId: string
@@ -66,28 +68,24 @@ export class AIService {
       console.log('✅ Google AI API available')
     }
 
-    // Check Hugging Face (gpt2, text-generation)
+    // Check Hugging Face (chatCompletion)
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
-        const response = await fetch('https://api-inference.huggingface.co/models/gpt2', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            inputs: 'test',
-            parameters: { max_new_tokens: 1, return_full_text: false }
-          })
+        const chatCompletion = await hfClient.chatCompletion({
+          provider: 'featherless-ai',
+          model: 'Menlo/Jan-nano-128k',
+          messages: [
+            { role: 'user', content: 'Hello!' }
+          ]
         })
-        if (response.ok) {
+        if (chatCompletion.choices && chatCompletion.choices.length > 0) {
           this.providers.huggingface = true
-          console.log('✅ Hugging Face API available')
+          console.log('✅ Hugging Face chatCompletion API available')
         } else {
-          throw new Error(`Status ${response.status}`)
+          throw new Error('No choices returned')
         }
       } catch (error) {
-        console.log('❌ Hugging Face API not available:', error)
+        console.log('❌ Hugging Face chatCompletion API not available:', error)
       }
     }
 
@@ -283,33 +281,21 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    // Use gpt2 as the default model with text-generation API
-    const model = request.model || 'gpt2'
+    // Use Featherless/Jan-nano-128k as the default chat model
+    const provider = 'featherless-ai'
+    const model = 'Menlo/Jan-nano-128k'
     
-    console.log(`Processing with Hugging Face model: ${model}`)
+    console.log(`Processing with Hugging Face chatCompletion: provider=${provider}, model=${model}`)
 
     try {
-      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: request.prompt,
-          parameters: {
-            max_new_tokens: 500,
-            temperature: 0.7,
-            do_sample: true,
-            return_full_text: false
-          }
-        })
+      const chatCompletion = await hfClient.chatCompletion({
+        provider,
+        model,
+        messages: [
+          { role: 'user', content: request.prompt }
+        ]
       })
-      if (!response.ok) {
-        throw new Error(`Hugging Face API error: ${response.status}`)
-      }
-      const data = await response.json()
-      const result = data.generated_text || 'No response generated'
+      const result = chatCompletion.choices?.[0]?.message?.content || 'No response generated'
 
       return {
         taskId: request.taskId,
@@ -320,7 +306,7 @@ export class AIService {
         tokensUsed: result.length
       }
     } catch (error) {
-      console.error(`Hugging Face API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error(`Hugging Face chatCompletion API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
       throw error
     }
   }
@@ -442,4 +428,19 @@ export class AIService {
   }
 }
 
-export const aiService = AIService.getInstance() 
+export const aiService = AIService.getInstance()
+
+export async function runChatCompletion(prompt: string) {
+  const chatCompletion = await hfClient.chatCompletion({
+    provider: "featherless-ai",
+    model: "Menlo/Jan-nano-128k",
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  return chatCompletion.choices[0].message.content;
+} 
