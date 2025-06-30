@@ -1108,7 +1108,7 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
         task_prompt: 'Research and provide a comprehensive summary of the latest startup news, funding rounds, and industry developments from the past 24 hours. Include key metrics, notable companies, and emerging trends.',
         schedule: 'daily' as const,
         category: 'news',
-        model: 'mock-ai-v1',
+        model: 'gemini-pro',
         complexity: 'medium' as const
       },
       {
@@ -1118,7 +1118,7 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
         task_prompt: 'Conduct a market analysis for the technology sector, focusing on emerging trends, competitive landscape, and growth opportunities. Include data on market size, key players, and future projections.',
         schedule: 'weekly' as const,
         category: 'analysis',
-        model: 'mock-ai-v1',
+        model: 'gemini-pro',
         complexity: 'high' as const
       },
       {
@@ -1128,7 +1128,7 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
         task_prompt: 'Monitor and report on competitor activities, product launches, pricing changes, and strategic moves. Focus on companies in the AI/ML space and provide actionable insights.',
         schedule: 'daily' as const,
         category: 'monitoring',
-        model: 'mock-ai-v1',
+        model: 'gemini-pro',
         complexity: 'medium' as const
       },
       {
@@ -1138,7 +1138,7 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
         task_prompt: 'Curate and summarize the most relevant articles, blog posts, and research papers in the AI and machine learning space. Focus on practical insights and actionable content.',
         schedule: 'daily' as const,
         category: 'content',
-        model: 'mock-ai-v1',
+        model: 'gemini-pro',
         complexity: 'low' as const
       },
       {
@@ -1148,7 +1148,7 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
         task_prompt: 'Monitor social media platforms for mentions of our brand and competitors. Analyze sentiment, identify trending topics, and report on key conversations in our industry.',
         schedule: 'hourly' as const,
         category: 'monitoring',
-        model: 'mock-ai-v1',
+        model: 'gemini-pro',
         complexity: 'medium' as const
       }
     ]

@@ -1,12 +1,12 @@
 export interface AIModel {
   id: string
   name: string
-  provider: 'mock' | 'openai' | 'anthropic'
+  provider: 'google'
   description: string
   maxTokens: number
   costPerToken: number
   speed: 'fast' | 'medium' | 'slow'
-  quality: 'low' | 'medium' | 'high'
+  quality: 'high'
   bestFor: string[]
   isAvailable: boolean
 }
@@ -20,19 +20,18 @@ export interface ModelPerformance {
 }
 
 export const availableModels: AIModel[] = [
-  // Mock AI Model
-  // {
-  //   id: 'mock-ai-v1',
-  //   name: 'Mock AI v1',
-  //   provider: 'mock',
-  //   description: 'Local mock AI for testing and development',
-  //   maxTokens: 1000,
-  //   costPerToken: 0,
-  //   speed: 'fast',
-  //   quality: 'medium',
-  //   bestFor: ['testing', 'development', 'prototyping'],
-  //   isAvailable: true
-  // }
+  {
+    id: 'gemini-pro',
+    name: 'Gemini Pro',
+    provider: 'google',
+    description: 'Google Gemini Pro model for advanced AI tasks',
+    maxTokens: 2000,
+    costPerToken: 0,
+    speed: 'fast',
+    quality: 'high',
+    bestFor: ['analysis', 'creative', 'strategy', 'technical', 'research'],
+    isAvailable: true
+  }
 ]
 
 export class ModelManager {
