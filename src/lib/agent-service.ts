@@ -239,7 +239,7 @@ export class AgentService {
         taskId,
         prompt: agent.task_prompt,
         userId: userId,
-        provider: 'openai' // Start with OpenAI for best results
+        provider: 'huggingface' // Use Hugging Face with Zephyr-7B-Beta
       })
       
       return {

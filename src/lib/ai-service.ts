@@ -114,6 +114,11 @@ export class AIService {
     // Determine best provider based on prompt content
     const promptLower = prompt.toLowerCase()
     
+    // Prioritize Hugging Face since it's already configured
+    if (this.providers.huggingface) {
+      return 'huggingface'
+    }
+    
     if (this.providers.openai && (promptLower.includes('analysis') || promptLower.includes('research'))) {
       return 'openai'
     }
@@ -122,9 +127,6 @@ export class AIService {
     }
     if (this.providers.google && (promptLower.includes('multimodal') || promptLower.includes('vision'))) {
       return 'google'
-    }
-    if (this.providers.huggingface) {
-      return 'huggingface'
     }
     
     // Return first available provider
@@ -271,26 +273,36 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    const response = await hf.textGeneration({
-      model: request.model || 'distilgpt2',
-      inputs: request.prompt,
-      parameters: {
-        max_new_tokens: 500,
-        temperature: 0.7,
-        do_sample: true,
-        return_full_text: false
+    // Use a reliable model that works with text generation
+    const model = request.model || 'gpt2' // Fallback to gpt2 which is always available
+    
+    console.log(`Processing with Hugging Face model: ${model}`)
+
+    try {
+      const response = await hf.textGeneration({
+        model: model,
+        inputs: request.prompt,
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.7,
+          do_sample: true,
+          return_full_text: false
+        }
+      })
+
+      const result = response.generated_text || 'No response generated'
+
+      return {
+        taskId: request.taskId,
+        result,
+        status: 'completed',
+        model: model,
+        provider: 'huggingface',
+        tokensUsed: result.length
       }
-    })
-
-    const result = response.generated_text || 'No response generated'
-
-    return {
-      taskId: request.taskId,
-      result,
-      status: 'completed',
-      model: request.model || 'distilgpt2',
-      provider: 'huggingface',
-      tokensUsed: result.length
+    } catch (error) {
+      console.error(`Hugging Face API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw error
     }
   }
 
@@ -367,7 +379,10 @@ export class AIService {
       let suggestedProvider = 'mock'
       let suggestedModel = 'mock-ai-v1'
 
-      if (this.providers.openai) {
+      if (this.providers.huggingface) {
+        suggestedProvider = 'huggingface'
+        suggestedModel = 'HuggingFaceH4/zephyr-7b-beta'
+      } else if (this.providers.openai) {
         suggestedProvider = 'openai'
         suggestedModel = complexity === 'high' ? 'gpt-4' : 'gpt-3.5-turbo'
       } else if (this.providers.anthropic) {
@@ -376,9 +391,6 @@ export class AIService {
       } else if (this.providers.google) {
         suggestedProvider = 'google'
         suggestedModel = 'gemini-pro'
-      } else if (this.providers.huggingface) {
-        suggestedProvider = 'huggingface'
-        suggestedModel = 'distilgpt2'
       }
 
       return {
