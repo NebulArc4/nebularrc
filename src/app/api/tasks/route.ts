@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 import { aiService } from '@/lib/ai-service'
-import { mockAIService } from '@/lib/mock-ai-service'
 
 // Choose which AI service to use based on environment
 const activeAIService = aiService

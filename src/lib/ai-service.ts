@@ -1,5 +1,3 @@
-import { mockAIService } from './mock-ai-service'
-
 export interface AITaskRequest {
   taskId: string
   prompt: string
@@ -239,10 +237,13 @@ export class AIService {
 
   private async processWithMock(request: AITaskRequest): Promise<AITaskResponse> {
     console.log(`Processing task ${request.taskId} with mock AI`)
-    const mockResponse = await mockAIService.processTask(request)
     return {
-      ...mockResponse,
-      provider: 'mock'
+      taskId: request.taskId,
+      result: 'Mock response',
+      status: 'completed',
+      model: 'mock-ai-v1',
+      provider: 'mock',
+      tokensUsed: 1000
     }
   }
 
