@@ -66,22 +66,18 @@ export class AIService {
       console.log('✅ Google AI API available')
     }
 
-    // Check Hugging Face (Zephyr-7B-Beta, conversational)
+    // Check Hugging Face (DialoGPT-medium, text-generation)
     if (process.env.HUGGINGFACE_API_KEY) {
       try {
-        const response = await fetch('https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta', {
+        const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            inputs: {
-              past_user_inputs: [],
-              generated_responses: [],
-              text: 'test'
-            },
-            parameters: { max_new_tokens: 1 }
+            inputs: 'test',
+            parameters: { max_new_tokens: 1, return_full_text: false }
           })
         })
         if (response.ok) {
@@ -287,8 +283,8 @@ export class AIService {
       throw new Error('Hugging Face not available')
     }
 
-    // Use Zephyr-7B-Beta as the default model with conversational API
-    const model = request.model || 'HuggingFaceH4/zephyr-7b-beta'
+    // Use DialoGPT-medium as the default model with text-generation API
+    const model = request.model || 'microsoft/DialoGPT-medium'
     
     console.log(`Processing with Hugging Face model: ${model}`)
 
@@ -300,15 +296,12 @@ export class AIService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          inputs: {
-            past_user_inputs: [],
-            generated_responses: [],
-            text: request.prompt
-          },
+          inputs: request.prompt,
           parameters: {
             max_new_tokens: 500,
             temperature: 0.7,
-            do_sample: true
+            do_sample: true,
+            return_full_text: false
           }
         })
       })
@@ -316,7 +309,7 @@ export class AIService {
         throw new Error(`Hugging Face API error: ${response.status}`)
       }
       const data = await response.json()
-      const result = data.generated_text || (data.generated_responses && data.generated_responses[0]) || 'No response generated'
+      const result = data.generated_text || 'No response generated'
 
       return {
         taskId: request.taskId,
@@ -407,7 +400,7 @@ export class AIService {
 
       if (this.providers.huggingface) {
         suggestedProvider = 'huggingface'
-        suggestedModel = 'HuggingFaceH4/zephyr-7b-beta'
+        suggestedModel = 'microsoft/DialoGPT-medium'
       } else if (this.providers.openai) {
         suggestedProvider = 'openai'
         suggestedModel = complexity === 'high' ? 'gpt-4' : 'gpt-3.5-turbo'
