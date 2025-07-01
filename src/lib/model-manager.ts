@@ -1,7 +1,7 @@
 export interface AIModel {
   id: string
   name: string
-  provider: 'google'
+  provider: 'groq'
   description: string
   maxTokens: number
   costPerToken: number
@@ -21,12 +21,36 @@ export interface ModelPerformance {
 
 export const availableModels: AIModel[] = [
   {
-    id: 'gemini-pro',
-    name: 'Gemini Pro',
-    provider: 'google',
-    description: 'Google Gemini Pro model for advanced AI tasks',
-    maxTokens: 2000,
-    costPerToken: 0,
+    id: 'llama3-8b-8192',
+    name: 'Llama 3.1 8B',
+    provider: 'groq',
+    description: 'Fast and efficient Llama 3.1 8B model via Groq',
+    maxTokens: 8192,
+    costPerToken: 0.00000005, // $0.05 per 1M tokens
+    speed: 'fast',
+    quality: 'high',
+    bestFor: ['analysis', 'creative', 'strategy', 'technical', 'research'],
+    isAvailable: true
+  },
+  {
+    id: 'llama3-70b-8192',
+    name: 'Llama 3.1 70B',
+    provider: 'groq',
+    description: 'High-performance Llama 3.1 70B model via Groq',
+    maxTokens: 8192,
+    costPerToken: 0.00000059, // $0.59 per 1M tokens
+    speed: 'fast',
+    quality: 'high',
+    bestFor: ['analysis', 'creative', 'strategy', 'technical', 'research'],
+    isAvailable: true
+  },
+  {
+    id: 'mixtral-8x7b-32768',
+    name: 'Mixtral 8x7B',
+    provider: 'groq',
+    description: 'Powerful Mixtral 8x7B model via Groq',
+    maxTokens: 32768,
+    costPerToken: 0.00000014, // $0.14 per 1M tokens
     speed: 'fast',
     quality: 'high',
     bestFor: ['analysis', 'creative', 'strategy', 'technical', 'research'],
@@ -165,7 +189,7 @@ export class ModelManager {
       
       // Quality score
       if (complexity === 'high' && model.quality === 'high') score += 3
-      else if (complexity === 'medium' && model.quality === 'medium') score += 2
+      else if (complexity === 'medium' && model.quality === 'high') score += 2
       else if (complexity === 'low' && model.speed === 'fast') score += 2
       
       // Speed score

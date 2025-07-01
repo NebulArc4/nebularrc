@@ -2,7 +2,7 @@ export interface AITaskRequest {
   taskId: string
   prompt: string
   userId: string
-  model?: string // Only Gemini models supported
+  model?: string // Only Groq models supported
 }
 
 export interface AITaskResponse {
@@ -27,50 +27,51 @@ export class AIService {
   }
 
   async processTask(request: AITaskRequest): Promise<AITaskResponse> {
-    return await this.processWithGoogle(request)
+    return await this.processWithGroq(request)
   }
 
-  private async processWithGoogle(request: AITaskRequest): Promise<AITaskResponse> {
-    if (!process.env.GOOGLE_AI_API_KEY) {
-      throw new Error('Google AI not available')
+  private async processWithGroq(request: AITaskRequest): Promise<AITaskResponse> {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error('Groq AI not available')
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${request.model || 'gemini-pro'}:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`, {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
+        model: request.model || 'llama3-8b-8192',
+        messages: [
           {
-            parts: [
-              {
-                text: request.prompt
-              }
-            ]
+            role: 'system',
+            content: 'You are NebulArc, an advanced AI assistant specialized in autonomous decision-making, research, and strategy. Provide comprehensive, well-structured responses that are actionable and insightful. Always maintain a professional tone and focus on delivering value.'
+          },
+          {
+            role: 'user',
+            content: request.prompt
           }
         ],
-        generationConfig: {
-          maxOutputTokens: 2000,
-          temperature: 0.7
-        }
+        max_tokens: 2000,
+        temperature: 0.7
       })
     })
 
     if (!response.ok) {
-      throw new Error(`Google AI API error: ${response.status}`)
+      throw new Error(`Groq AI API error: ${response.status}`)
     }
 
     const data = await response.json()
-    const result = data.candidates[0]?.content?.parts[0]?.text || 'No response generated'
+    const result = data.choices[0]?.message?.content || 'No response generated'
 
     return {
       taskId: request.taskId,
       result,
       status: 'completed',
-      model: request.model || 'gemini-pro',
-      provider: 'google',
-      tokensUsed: result.length // Approximate
+      model: request.model || 'llama3-8b-8192',
+      provider: 'groq',
+      tokensUsed: data.usage?.total_tokens
     }
   }
 }
