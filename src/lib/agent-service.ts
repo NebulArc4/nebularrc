@@ -1,7 +1,5 @@
 import { getSupabaseServer } from './supabase-server'
 import { aiService } from './ai-service'
-import { createClient } from '@supabase/supabase-js'
-import { newsService } from './news-service'
 
 export interface Agent {
   id: string
@@ -179,8 +177,8 @@ export class AgentService {
     }
 
     try {
-      // Execute the agent task with specialized handling
-      const aiResponse = await this.executeSpecializedAgentTask(agent, run.id, userId)
+      // Execute the agent task using Groq AI
+      const aiResponse = await this.executeAgentTask(agent, run.id, userId)
 
       // Update run with result
       const updateData: any = {
@@ -205,22 +203,26 @@ export class AgentService {
       await this.supabase
         .from('agents')
         .update({
-          last_run: new Date().toISOString(),
-          next_run: this.calculateNextRun(agent.schedule, agent.custom_schedule),
           total_runs: agent.total_runs + 1,
-          updated_at: new Date().toISOString()
+          last_run: new Date().toISOString(),
+          next_run: this.calculateNextRun(agent.schedule, agent.custom_schedule)
         })
         .eq('id', agentId)
 
-      return { ...run, ...updateData }
+      return {
+        ...run,
+        ...updateData
+      }
 
     } catch (error) {
-      // Update run as failed
+      console.error('Error executing agent task:', error)
+      
+      // Update run with error
       await this.supabase
         .from('agent_runs')
         .update({
           status: 'failed',
-          error_message: 'Agent execution failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error occurred',
           completed_at: new Date().toISOString()
         })
         .eq('id', run.id)
@@ -229,834 +231,23 @@ export class AgentService {
     }
   }
 
-  private async executeSpecializedAgentTask(agent: Agent, taskId: string, userId: string): Promise<any> {
-    // --- INTENT DETECTION ---
-    const prompt = agent.task_prompt.toLowerCase();
-    const newsKeywords = ['news', 'headline', 'headlines', 'update', 'updates', 'breaking', 'latest', 'report', 'story', 'stories', 'score', 'scores', 'sports', 'nba', 'nfl', 'mlb', 'soccer', 'football'];
-    const isNewsIntent = newsKeywords.some(k => prompt.includes(k));
-
-    if (isNewsIntent) {
-      // --- FETCH REAL DATA ---
-      let articles = [];
-      try {
-        articles = await newsService.getTopHeadlines({ category: 'sports', country: 'us', q: '' });
-      } catch (err) {
-        console.error('Failed to fetch real news:', err);
-        // fallback to mock data
-        articles = [
-          {
-            title: "Lakers vs Warriors: Epic Showdown in Western Conference Finals",
-            description: "The Los Angeles Lakers defeated the Golden State Warriors 120-115 in a thrilling Game 7, advancing to the NBA Finals. LeBron James scored 35 points with 12 assists.",
-            url: "https://www.nba.com/lakers-warriors-game7-2024",
-            urlToImage: null,
-            source: { name: "NBA" }
-          }
-        ];
-      }
-      // --- AI SUMMARIZATION ---
-      let aiSummary = '';
-      try {
-        const aiResponse = await aiService.processTask({
-          taskId,
-          prompt: `Summarize these sports news headlines in 3 bullet points for a business dashboard.\n${articles.map(a => a.title + ': ' + a.description).join('\n')}`,
-          userId
-        });
-        aiSummary = aiResponse.result;
-      } catch (err) {
-        aiSummary = '';
-      }
-      // --- STRUCTURED RESPONSE ---
-      return {
-        taskId,
-        result: JSON.stringify({
-          type: 'news-cards',
-          articles: articles.map(a => ({
-            title: a.title,
-            summary: a.description,
-            image: a.urlToImage || null,
-            url: a.url,
-            source: a.source?.name || 'Unknown'
-          })),
-          aiSummary
-        }),
-        status: 'completed',
-        model: 'newsapi+ai',
-        tokensUsed: 0
-      };
-    }
-    // --- FALLBACK: LLM ---
-    // Use the existing LLM pipeline for other prompts
+  private async executeAgentTask(agent: Agent, taskId: string, userId: string): Promise<any> {
+    // Use Groq AI for all agent tasks
     const aiResponse = await aiService.processTask({
       taskId,
       prompt: agent.task_prompt,
-      userId
-    });
+      userId,
+      model: agent.model || 'llama3-8b-8192'
+    })
+
     return {
       taskId,
       result: aiResponse.result,
       status: aiResponse.status,
       model: aiResponse.model,
-      tokensUsed: aiResponse.tokensUsed
-    };
-  }
-
-  private determineAgentType(agent: Agent): string {
-    const name = agent.name.toLowerCase()
-    const description = agent.description.toLowerCase()
-    const prompt = agent.task_prompt.toLowerCase()
-
-    // Enhanced keyword detection for news/sports
-    const newsKeywords = [
-      'news', 'headline', 'headlines', 'update', 'updates', 'breaking', 'latest', 'report', 'story', 'stories'
-    ]
-    const sportsKeywords = [
-      'sport', 'sports', 'football', 'basketball', 'soccer', 'nba', 'nfl', 'mlb', 'nhl', 'tennis', 'golf', 'cricket', 'match', 'game', 'score', 'scores'
-    ]
-    const text = `${name} ${description} ${prompt}`
-
-    // Sports-news: if any sports keyword and any news keyword present
-    if (sportsKeywords.some(k => text.includes(k)) && newsKeywords.some(k => text.includes(k))) {
-      console.log('✅ Detected: sports-news (enhanced)')
-      return 'sports-news'
+      tokensUsed: aiResponse.tokensUsed,
+      error: aiResponse.error
     }
-    // General news: if any news keyword present
-    if (newsKeywords.some(k => text.includes(k))) {
-      console.log('✅ Detected: startup-news (enhanced)')
-      return 'startup-news'
-    }
-    if (name.includes('startup') || name.includes('news') || prompt.includes('startup news')) {
-      console.log('✅ Detected: startup-news')
-      return 'startup-news'
-    }
-    if (name.includes('market') || name.includes('analysis') || prompt.includes('market analysis')) {
-      console.log('✅ Detected: market-analysis')
-      return 'market-analysis'
-    }
-    if (name.includes('competitor') || name.includes('monitor') || prompt.includes('competitor')) {
-      console.log('✅ Detected: competitor-monitor')
-      return 'competitor-monitor'
-    }
-    if (name.includes('content') || name.includes('curator') || prompt.includes('curate')) {
-      console.log('✅ Detected: content-curator')
-      return 'content-curator'
-    }
-    if (name.includes('social') || name.includes('media') || prompt.includes('social media')) {
-      console.log('✅ Detected: social-media-monitor')
-      return 'social-media-monitor'
-    }
-    if (name.includes('sport') || name.includes('sporta') || prompt.includes('sport') || prompt.includes('sports news') || prompt.includes('football') || prompt.includes('basketball') || prompt.includes('soccer')) {
-      console.log('✅ Detected: sports-news')
-      return 'sports-news'
-    }
-    
-    console.log('❌ No specific type detected, using generic')
-    return 'generic'
-  }
-
-  private async executeStartupNewsAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000))
-    
-    const currentDate = new Date().toLocaleDateString()
-    const currentYear = new Date().getFullYear()
-    
-    const newsItems = [
-      {
-        title: "OpenAI Launches GPT-5 with Multimodal Capabilities",
-        summary: "OpenAI has officially released GPT-5, featuring advanced multimodal understanding, improved reasoning, and enhanced safety measures. The model shows significant improvements in coding, analysis, and creative tasks.",
-        link: "https://openai.com/blog/gpt-5",
-        category: "AI/ML",
-        impact: "High"
-      },
-      {
-        title: "Anthropic Raises $750M Series D at $18B Valuation",
-        summary: "Anthropic has secured $750 million in Series D funding led by Menlo Ventures, valuing the AI safety company at $18 billion. The funding will accelerate Claude's development and enterprise adoption.",
-        link: "https://www.anthropic.com/news/series-d-funding",
-        category: "Funding",
-        impact: "High"
-      },
-      {
-        title: "Stripe Introduces AI-Powered Fraud Detection",
-        summary: "Stripe has launched Radar AI, a new fraud detection system using machine learning to identify and prevent fraudulent transactions in real-time, reducing chargebacks by 40%.",
-        link: "https://stripe.com/blog/radar-ai-launch",
-        category: "FinTech",
-        impact: "Medium"
-      },
-      {
-        title: "Notion Acquires AI Writing Startup for $200M",
-        summary: "Notion has acquired Flowrite, an AI-powered writing assistant, for $200 million to enhance its collaborative writing features and compete with Microsoft Copilot.",
-        link: "https://www.notion.so/blog/flowrite-acquisition",
-        category: "Acquisition",
-        impact: "Medium"
-      },
-      {
-        title: "Tesla's Robotaxi Service Goes Live in Austin",
-        summary: "Tesla has launched its autonomous robotaxi service in Austin, Texas, marking a major milestone in autonomous vehicle deployment. The service uses Tesla's FSD technology.",
-        link: "https://www.tesla.com/robotaxi-austin",
-        category: "Autonomous Vehicles",
-        impact: "High"
-      }
-    ]
-
-    const result = `# 🚀 Startup & Tech News Report - ${currentDate}
-
-## 📊 Executive Summary
-The startup ecosystem continues to thrive with $950M+ in new funding announced this week. AI/ML remains the dominant sector, with significant developments in autonomous vehicles, fintech, and enterprise software.
-
-## 🔥 Top Stories
-
-${newsItems.map((item, index) => `
-### ${index + 1}. ${item.title}
-**Category:** ${item.category} | **Impact:** ${item.impact}
-
-${item.summary}
-
-🔗 [Read Full Story](${item.link})
-
----
-`).join('')}
-
-## 📈 Market Trends
-
-### 🎯 AI/ML Dominance
-- **Funding:** 65% of all startup funding goes to AI companies
-- **Valuations:** AI startups seeing 3-5x valuation multiples
-- **Enterprise Adoption:** 78% of Fortune 500 using AI solutions
-
-### 💰 Funding Landscape
-| Sector | Total Funding | YoY Growth | Top Deals |
-|--------|---------------|------------|-----------|
-| AI/ML | $45B | +120% | Anthropic ($750M) |
-| FinTech | $28B | +85% | Stripe ($6.5B) |
-| HealthTech | $18B | +65% | Moderna ($2B) |
-| SaaS | $32B | +45% | Notion ($200M) |
-
-### 🌍 Geographic Distribution
-- **Silicon Valley:** 45% of total funding
-- **New York:** 18% of total funding  
-- **London:** 12% of total funding
-- **Asia:** 15% of total funding
-
-## 🎯 Key Insights
-
-### 1. **AI Revolution Continues**
-- GPT-5 launch signals new era of AI capabilities
-- Anthropic's funding shows strong investor confidence
-- Enterprise AI adoption accelerating rapidly
-
-### 2. **Autonomous Vehicle Milestone**
-- Tesla's robotaxi launch is industry breakthrough
-- Regulatory approval for autonomous services
-- New mobility business models emerging
-
-### 3. **FinTech Innovation**
-- AI-powered fraud detection becoming standard
-- Real-time payment processing improvements
-- Blockchain integration in traditional finance
-
-## 📊 Quick Stats
-- **Total Funding This Week:** $950M+
-- **Major Announcements:** 5
-- **Categories Covered:** AI/ML, Funding, FinTech, Acquisition, Autonomous Vehicles
-- **Average Deal Size:** $190M
-
-## 🏆 Unicorn Watch
-| Company | Valuation | Sector | Latest Round |
-|---------|-----------|--------|--------------|
-| Anthropic | $18B | AI/ML | Series D |
-| Stripe | $95B | FinTech | Series H |
-| Notion | $10B | SaaS | Series C |
-| Tesla | $800B | Auto | Public |
-
-## 📱 Social Media Highlights
-- **Most Discussed:** OpenAI GPT-5 launch
-- **Viral Startup:** Flowrite (Notion acquisition)
-- **Trending Topic:** #AIFunding #Robotaxi
-
----
-*Report generated by ${agent.name} on ${currentDate} | Data current as of ${currentDate}*`
-
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'specialized-news-agent',
-      tokensUsed: result.length
-    }
-  }
-
-  private async executeMarketAnalysisAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, 4000 + Math.random() * 3000))
-    
-    const currentDate = new Date().toLocaleDateString()
-    const currentYear = new Date().getFullYear()
-    
-    const result = `# 📊 Market Analysis Report - Technology Sector
-
-## 🎯 Executive Summary
-The technology sector continues to demonstrate robust growth with AI/ML driving significant innovation and investment. Market size estimated at $3.2T globally with 15% YoY growth, fueled by AI adoption and digital transformation initiatives.
-
-## 📈 Market Overview
-
-### Market Size & Growth
-- **Global Tech Market:** $3.2T (${currentYear})
-- **YoY Growth:** 15%
-- **AI/ML Segment:** $580B (18% of total)
-- **Projected ${currentYear + 1}:** $3.7T
-
-### Key Growth Drivers
-1. **AI/ML Adoption:** 82% of enterprises implementing AI solutions
-2. **Cloud Migration:** 88% of workloads expected to be cloud-based by ${currentYear + 1}
-3. **Digital Transformation:** $2.8T spent globally on DX initiatives
-4. **Cybersecurity:** $220B market growing at 12% annually
-
-## 🏢 Competitive Landscape
-
-### Market Leaders
-| Company | Market Cap | AI Focus | Key Strengths |
-|---------|------------|----------|---------------|
-| Microsoft | $3.1T | Azure AI, Copilot | Enterprise integration |
-| Apple | $2.9T | Siri, ML chips | Consumer ecosystem |
-| NVIDIA | $2.2T | AI chips, CUDA | Hardware leadership |
-| Google | $1.8T | Gemini, Cloud AI | Research leadership |
-| Amazon | $1.7T | AWS AI, Bedrock | Infrastructure scale |
-| Meta | $1.1T | Llama, AI research | Social AI applications |
-
-### Emerging Players
-- **Anthropic:** $18B valuation, AI safety focus
-- **OpenAI:** $80B valuation, GPT models
-- **Cohere:** $2.2B valuation, enterprise LLMs
-- **Hugging Face:** $4.5B valuation, open-source AI
-- **Databricks:** $43B valuation, data/AI platform
-
-## 📊 Market Trends
-
-### 1. **AI Democratization**
-- Open-source models gaining enterprise traction
-- Smaller companies accessing enterprise-grade AI
-- Cost reduction in AI implementation (40% YoY)
-- No-code AI platforms growing 200% annually
-
-### 2. **Edge Computing Revolution**
-- AI processing moving closer to data sources
-- Reduced latency (60% improvement) and improved privacy
-- IoT integration driving 25% CAGR
-- 5G enabling real-time AI applications
-
-### 3. **Responsible AI**
-- Focus on AI safety and alignment
-- Regulatory compliance requirements (GDPR, AI Act)
-- Ethical AI development practices
-- Transparency and explainability standards
-
-### 4. **Quantum Computing**
-- Early commercial applications emerging
-- $8B market expected by ${currentYear + 5}
-- Quantum AI algorithms in development
-- Major tech companies investing heavily
-
-## 🎯 Growth Opportunities
-
-### High-Growth Segments
-1. **AI Infrastructure:** 28% CAGR expected
-2. **Cybersecurity AI:** 25% CAGR expected
-3. **Healthcare AI:** 22% CAGR expected
-4. **FinTech AI:** 20% CAGR expected
-5. **Autonomous Vehicles:** 18% CAGR expected
-
-### Regional Opportunities
-- **North America:** 48% of global market
-- **Asia-Pacific:** Fastest growing region (20% CAGR)
-- **Europe:** Strong regulatory framework driving adoption
-- **Latin America:** Emerging market with 15% CAGR
-
-## ⚠️ Risk Factors
-
-### Market Risks
-1. **Regulatory Uncertainty:** Evolving AI regulations globally
-2. **Talent Shortage:** High demand for AI specialists (2M+ gap)
-3. **Economic Downturn:** Potential impact on tech spending
-4. **Cybersecurity Threats:** AI-powered attacks increasing
-5. **Supply Chain Issues:** Semiconductor shortages
-
-### Technology Risks
-1. **AI Hallucination:** Reliability concerns in critical applications
-2. **Data Privacy:** Increasing regulatory scrutiny
-3. **Energy Consumption:** AI models requiring significant power
-4. **Bias and Fairness:** Algorithmic bias concerns
-
-## 📈 Investment Recommendations
-
-### Short-term (6-12 months)
-- Focus on AI infrastructure and tools
-- Invest in cybersecurity AI solutions
-- Target enterprise SaaS companies
-- Consider quantum computing startups
-
-### Long-term (2-5 years)
-- Autonomous vehicle technology
-- Healthcare AI applications
-- Edge computing infrastructure
-- Responsible AI platforms
-
-## 🏆 Market Performance
-
-### Top Performing Sectors (${currentYear})
-| Sector | Growth Rate | Market Size | Key Players |
-|--------|-------------|-------------|-------------|
-| AI/ML | 28% | $580B | OpenAI, Anthropic, NVIDIA |
-| Cybersecurity | 12% | $220B | CrowdStrike, Palo Alto |
-| Cloud Computing | 18% | $680B | AWS, Azure, GCP |
-| SaaS | 15% | $320B | Salesforce, Microsoft |
-| FinTech | 20% | $180B | Stripe, Square, PayPal |
-
-## 📱 Social Media Sentiment
-- **Positive:** 68% of tech discussions
-- **Neutral:** 25% of tech discussions  
-- **Negative:** 7% of tech discussions
-- **Trending Topics:** #AIRevolution #TechGrowth #DigitalTransformation
-
----
-*Report generated by ${agent.name} on ${currentDate} | Data current as of ${currentDate}*`
-
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'specialized-market-agent',
-      tokensUsed: result.length
-    }
-  }
-
-  private async executeCompetitorMonitorAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, 2500 + Math.random() * 2000))
-    
-    const result = `# 🕵️ Competitor Intelligence Report - AI/ML Space
-
-## 🎯 Executive Summary
-Key competitors in the AI/ML space are actively launching new products, adjusting pricing strategies, and expanding their market presence. Significant activity observed in enterprise AI solutions.
-
-## 🚀 Recent Product Launches
-
-### OpenAI
-- **GPT-5 Beta:** Enhanced reasoning capabilities
-- **Enterprise API:** Improved rate limits and features
-- **DALL-E 3:** Advanced image generation
-- **Impact:** Strengthening enterprise position
-
-### Anthropic
-- **Claude 3.5 Sonnet:** Improved performance
-- **Constitutional AI:** Safety-focused approach
-- **Enterprise Features:** Enhanced security and compliance
-- **Impact:** Growing enterprise adoption
-
-### Google
-- **Gemini 1.5 Pro:** Multimodal capabilities
-- **Vertex AI:** Enhanced ML platform
-- **AI Studio:** Developer tools
-- **Impact:** Expanding developer ecosystem
-
-## 💰 Pricing Strategy Changes
-
-### Recent Updates
-| Company | Product | Old Price | New Price | Change |
-|---------|---------|-----------|-----------|---------|
-| OpenAI | GPT-4 API | $0.03/1K | $0.02/1K | -33% |
-| Anthropic | Claude Pro | $20/month | $15/month | -25% |
-| Google | Vertex AI | Variable | 15% discount | -15% |
-
-### Strategic Implications
-- **Price Wars:** Competition driving down costs
-- **Enterprise Focus:** Premium features for business users
-- **Developer Adoption:** Lower barriers to entry
-
-## 🎯 Strategic Moves
-
-### Partnerships & Acquisitions
-1. **Microsoft + OpenAI:** Extended partnership, $10B investment
-2. **Google + Anthropic:** Strategic partnership discussions
-3. **Amazon + Hugging Face:** AWS integration partnership
-4. **Meta + AI Research:** Open-source model releases
-
-### Market Expansion
-- **Geographic:** Asia-Pacific expansion
-- **Vertical:** Healthcare, finance, legal sectors
-- **Customer:** SMB market focus
-
-## 📊 Competitive Positioning
-
-### Strengths Analysis
-| Competitor | Key Strengths | Weaknesses | Opportunities |
-|------------|---------------|------------|---------------|
-| OpenAI | Brand recognition, GPT models | High costs, API limits | Enterprise expansion |
-| Anthropic | AI safety, Claude quality | Smaller ecosystem | Research partnerships |
-| Google | Infrastructure, research | Complex pricing | Developer tools |
-| Microsoft | Enterprise integration | Limited consumer focus | AI copilot expansion |
-
-## 🚨 Threat Assessment
-
-### High Priority Threats
-1. **OpenAI's Enterprise Push:** Direct competition for enterprise customers
-2. **Google's Developer Focus:** Potential developer ecosystem lock-in
-3. **Anthropic's Safety Focus:** Differentiation in responsible AI
-4. **Microsoft's Integration:** Seamless enterprise workflow integration
-
-### Medium Priority Threats
-1. **Open Source Models:** Cost pressure from free alternatives
-2. **Specialized AI:** Vertical-specific solutions
-3. **Regional Players:** Local market advantages
-
-## 📈 Recommendations
-
-### Immediate Actions (30 days)
-1. **Monitor Pricing:** Track competitor price changes
-2. **Feature Analysis:** Evaluate new product capabilities
-3. **Customer Feedback:** Gather insights on competitor usage
-
-### Strategic Actions (90 days)
-1. **Differentiation:** Identify unique value propositions
-2. **Partnerships:** Explore strategic alliances
-3. **Product Roadmap:** Align with market trends
-
-### Long-term Strategy (6 months)
-1. **Market Positioning:** Define competitive advantages
-2. **Innovation Pipeline:** Develop unique capabilities
-3. **Customer Retention:** Strengthen existing relationships
-
-## 📊 Monitoring Metrics
-- **Product Launches:** Weekly tracking
-- **Pricing Changes:** Real-time monitoring
-- **Market Share:** Quarterly analysis
-- **Customer Sentiment:** Continuous feedback
-
----
-*Report generated by ${agent.name} | Last updated: ${new Date().toLocaleDateString()}*`
-
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'specialized-competitor-agent',
-      tokensUsed: result.length
-    }
-  }
-
-  private async executeContentCuratorAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1500))
-    
-    const result = `# 📚 AI/ML Content Curation Report
-
-## 🎯 Today's Top Picks
-
-### 🔥 Featured Article
-**"The Future of AI: 2024 Trends and Predictions"**
-*By Sarah Chen, AI Research Institute*
-📖 [Read Full Article](https://ai-research.org/future-ai-2024-trends)
-
-**Key Takeaways:**
-- Multimodal AI becoming mainstream
-- Focus on AI safety and alignment
-- Edge AI deployment accelerating
-- Regulatory frameworks evolving
-
----
-
-### 📊 Research Papers
-
-#### 1. "Efficient Large Language Model Training"
-*Authors: Zhang et al., Stanford University*
-🔗 [Paper Link](https://arxiv.org/abs/2401.00123)
-**Impact:** High | **Read Time:** 15 min
-
-**Abstract:** Novel approach to reduce LLM training costs by 40% while maintaining performance.
-
-#### 2. "AI Safety in Practice: A Framework"
-*Authors: Johnson & Smith, MIT*
-🔗 [Paper Link](https://arxiv.org/abs/2401.00124)
-**Impact:** Medium | **Read Time:** 20 min
-
-**Abstract:** Practical framework for implementing AI safety measures in production systems.
-
----
-
-### 🎥 Video Content
-
-#### "Building AI Products That Scale"
-*By David Rodriguez, TechCrunch*
-▶️ [Watch Video](https://youtube.com/watch?v=ai-scaling-2024)
-**Duration:** 25 min | **Views:** 45K
-
-**Topics Covered:**
-- Architecture decisions for AI products
-- Scaling challenges and solutions
-- Cost optimization strategies
-
----
-
-### 🎙️ Podcast Episodes
-
-#### "The AI Revolution in Healthcare"
-*Host: Dr. Emily Watson*
-🎧 [Listen Here](https://spotify.com/ai-healthcare-episode)
-**Duration:** 45 min | **Rating:** 4.8/5
-
-**Key Discussion Points:**
-- AI diagnostics accuracy improvements
-- Regulatory challenges in healthcare AI
-- Patient privacy considerations
-
----
-
-### 📱 Social Media Highlights
-
-#### Twitter Thread: "AI Ethics in 2024"
-*By @AIEthicsExpert*
-🐦 [Read Thread](https://twitter.com/ai-ethics-thread)
-
-**Key Points:**
-- Bias detection and mitigation
-- Transparency in AI decision-making
-- Accountability frameworks
-
----
-
-## 📈 Content Trends Analysis
-
-### Most Discussed Topics
-1. **AI Safety & Alignment** (32% of content)
-2. **Multimodal AI** (28% of content)
-3. **Enterprise AI Adoption** (25% of content)
-4. **AI Regulation** (15% of content)
-
-### Content Format Distribution
-- **Articles:** 40%
-- **Research Papers:** 25%
-- **Videos:** 20%
-- **Podcasts:** 10%
-- **Social Media:** 5%
-
-## 🎯 Actionable Insights
-
-### For Developers
-- Focus on multimodal AI development
-- Implement safety measures early
-- Consider edge deployment strategies
-
-### For Business Leaders
-- Evaluate AI safety frameworks
-- Monitor regulatory developments
-- Plan for multimodal AI integration
-
-### For Researchers
-- Explore efficient training methods
-- Contribute to safety frameworks
-- Focus on practical applications
-
-## 📊 Quality Metrics
-- **Content Quality Score:** 8.7/10
-- **Relevance Score:** 9.2/10
-- **Diversity Score:** 8.5/10
-- **Timeliness Score:** 9.0/10
-
-## 🔗 Additional Resources
-- [AI Research Repository](https://github.com/ai-research)
-- [AI Safety Resources](https://aisafety.org/resources)
-- [AI Ethics Guidelines](https://ai-ethics.org/guidelines)
-
----
-*Curated by ${agent.name} | ${new Date().toLocaleDateString()}*`
-
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'specialized-curator-agent',
-      tokensUsed: result.length
-    }
-  }
-
-  private async executeSocialMediaMonitorAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, 1800 + Math.random() * 1200))
-    
-    const result = `# 📱 Social Media Intelligence Report
-
-## 🎯 Executive Summary
-Social media monitoring reveals strong engagement around AI topics, with sentiment trending positive (68% positive, 22% neutral, 10% negative). Key conversations focus on AI safety, new product launches, and industry developments.
-
-## 📊 Platform Analysis
-
-### Twitter/X Activity
-**Total Mentions:** 15,432 (24h)
-**Engagement Rate:** 4.2%
-**Top Hashtags:** #AI, #MachineLearning, #TechNews
-
-#### Trending Topics
-1. **#AISafety** - 2,847 mentions
-2. **#GPT5** - 1,923 mentions  
-3. **#ClaudeAI** - 1,456 mentions
-4. **#AIEthics** - 1,234 mentions
-
-### LinkedIn Activity
-**Total Posts:** 8,234 (24h)
-**Engagement Rate:** 6.8%
-**Top Industries:** Technology, Healthcare, Finance
-
-#### Popular Content Types
-- Industry insights (45%)
-- Product announcements (30%)
-- Thought leadership (25%)
-
-### Reddit Activity
-**Total Posts:** 3,456 (24h)
-**Top Subreddits:** r/MachineLearning, r/artificial, r/AI
-
-#### Hot Discussions
-- "GPT-5 vs Claude 3.5 comparison" (2.3k upvotes)
-- "AI safety concerns" (1.8k upvotes)
-- "Future of AI development" (1.5k upvotes)
-
-## 🎭 Sentiment Analysis
-
-### Overall Sentiment
-- **Positive:** 68% 😊
-- **Neutral:** 22% 😐
-- **Negative:** 10% 😞
-
-### Sentiment by Topic
-| Topic | Positive | Neutral | Negative |
-|-------|----------|---------|----------|
-| AI Safety | 75% | 20% | 5% |
-| Product Launches | 82% | 15% | 3% |
-| AI Ethics | 45% | 35% | 20% |
-| Industry News | 70% | 25% | 5% |
-
-## 🔥 Viral Content
-
-### Top Performing Posts
-
-#### 1. "The AI Revolution is Here" 
-*By @TechInfluencer*
-📊 **Engagement:** 45.2K likes, 8.9K shares
-🎯 **Reach:** 2.3M impressions
-🔗 [View Post](https://twitter.com/tech-influencer/ai-revolution)
-
-#### 2. "AI Safety Guidelines for Developers"
-*By @AISafetyExpert*
-📊 **Engagement:** 32.1K likes, 12.3K shares
-🎯 **Reach:** 1.8M impressions
-🔗 [View Post](https://linkedin.com/ai-safety-guidelines)
-
-#### 3. "Comparing AI Models: A Developer's Guide"
-*By @MLDeveloper*
-📊 **Engagement:** 28.7K likes, 15.6K shares
-🎯 **Reach:** 1.5M impressions
-🔗 [View Post](https://twitter.com/ml-developer/ai-comparison)
-
-## 🎯 Brand Mentions
-
-### Our Brand
-**Total Mentions:** 234 (24h)
-**Sentiment:** 78% positive
-**Key Topics:** Product features, customer support, innovation
-
-### Competitor Mentions
-| Competitor | Mentions | Sentiment | Key Topics |
-|------------|----------|-----------|------------|
-| OpenAI | 5,234 | 72% positive | GPT-5, API updates |
-| Anthropic | 2,156 | 81% positive | Claude, AI safety |
-| Google | 3,789 | 68% positive | Gemini, research |
-
-## 📈 Trend Analysis
-
-### Rising Trends
-1. **AI Safety Discussions** (+45% week-over-week)
-2. **Multimodal AI** (+32% week-over-week)
-3. **AI Ethics** (+28% week-over-week)
-4. **Edge AI** (+25% week-over-week)
-
-### Declining Trends
-1. **Basic AI Tutorials** (-15% week-over-week)
-2. **Hype-driven Content** (-22% week-over-week)
-
-## 🎯 Influencer Activity
-
-### Top AI Influencers
-1. **@AIScientist** - 2.1M followers, 89% engagement
-2. **@TechAnalyst** - 1.8M followers, 76% engagement
-3. **@MLExpert** - 1.5M followers, 82% engagement
-
-### Recent Influencer Posts
-- "The future of AI development" by @AIScientist
-- "AI safety best practices" by @TechAnalyst
-- "Comparing AI models" by @MLExpert
-
-## 🚨 Crisis Monitoring
-
-### Potential Issues
-- **AI Safety Concerns:** Growing discussion around risks
-- **Privacy Issues:** Questions about data handling
-- **Job Displacement:** Fears about AI impact on employment
-
-### Response Recommendations
-1. **Proactive Communication:** Address safety concerns
-2. **Transparency:** Share privacy practices
-3. **Education:** Provide information about AI benefits
-
-## 📊 Key Metrics Summary
-- **Total Mentions:** 27,122 (24h)
-- **Average Engagement Rate:** 5.2%
-- **Sentiment Score:** 7.8/10
-- **Trending Topics:** 8 identified
-- **Influencer Mentions:** 156
-
-## 🎯 Action Items
-1. **Monitor AI Safety Discussions** - High priority
-2. **Engage with Positive Mentions** - Medium priority
-3. **Address Negative Sentiment** - High priority
-4. **Track Competitor Activity** - Medium priority
-
----
-*Report generated by ${agent.name} | ${new Date().toLocaleDateString()}*`
-
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'specialized-social-agent',
-      tokensUsed: result.length
-    }
-  }
-
-  private async executeSportsNewsAgent(agent: Agent, taskId: string, userId: string): Promise<any> {
-    // Try to fetch real sports news
-    let articles: any[] = [];
-    try {
-      articles = await newsService.getTopHeadlines({ category: 'sports', country: 'us' });
-    } catch (err) {
-      console.error('Failed to fetch real sports news, falling back to mock:', err);
-      // fallback to mock data
-      articles = [
-        {
-          title: "Lakers vs Warriors: Epic Showdown in Western Conference Finals",
-          description: "The Los Angeles Lakers defeated the Golden State Warriors 120-115 in a thrilling Game 7, advancing to the NBA Finals. LeBron James scored 35 points with 12 assists.",
-          url: "https://www.nba.com/lakers-warriors-game7-2024",
-          source: { name: "NBA" }
-        }
-      ];
-    }
-    const currentDate = new Date().toLocaleDateString();
-    const result = `# 🏈 Sports News Report - ${currentDate}
-
-## 📰 Top Sports Headlines
-${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.source?.name || 'Unknown'}*\n${a.description || ''}\n`).join('\n')}
----\n*Report generated by ${agent.name} on ${currentDate}*`;
-    return {
-      taskId,
-      result,
-      status: 'completed',
-      model: 'newsapi+ai',
-      tokensUsed: result.length
-    };
   }
 
   async getDueAgents(): Promise<Agent[]> {
@@ -1089,66 +280,75 @@ ${articles.map((a, i) => `### ${i + 1}. [${a.title}](${a.url})\n*Source: ${a.sou
       case 'monthly':
         return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
       case 'custom':
-        // For custom schedules, we'll use a simple approach
-        // In production, you'd want to use a proper cron parser
+        // For custom schedules, you might want to use a cron parser
+        // For now, default to daily
         return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
       default:
         return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
     }
   }
 
-  // Get agent templates for common use cases
   getAgentTemplates() {
     return [
       {
-        id: 'startup-news',
-        name: 'Startup News Aggregator',
-        description: 'Collects and summarizes the latest startup news and funding rounds',
-        task_prompt: 'Research and provide a comprehensive summary of the latest startup news, funding rounds, and industry developments from the past 24 hours. Include key metrics, notable companies, and emerging trends.',
-        schedule: 'daily' as const,
+        id: 'news-summarizer',
+        name: 'News Summarizer',
+        description: 'Summarize current news and provide insights',
+        task_prompt: 'Analyze and summarize the latest news in {topic}. Provide key insights, trends, and implications. Focus on the most important developments and their potential impact.',
+        schedule: 'daily',
         category: 'news',
         model: 'llama3-8b-8192',
-        complexity: 'medium' as const
+        complexity: 'medium'
       },
       {
-        id: 'market-analysis',
-        name: 'Market Analysis Agent',
-        description: 'Analyzes market trends and provides insights on specific industries',
-        task_prompt: 'Conduct a market analysis for the technology sector, focusing on emerging trends, competitive landscape, and growth opportunities. Include data on market size, key players, and future projections.',
-        schedule: 'weekly' as const,
+        id: 'market-analyzer',
+        name: 'Market Analyzer',
+        description: 'Analyze market trends and provide strategic insights',
+        task_prompt: 'Conduct a comprehensive market analysis for {industry/sector}. Include current trends, key players, opportunities, threats, and strategic recommendations for businesses.',
+        schedule: 'weekly',
         category: 'analysis',
         model: 'llama3-8b-8192',
-        complexity: 'high' as const
-      },
-      {
-        id: 'competitor-monitor',
-        name: 'Competitor Monitor',
-        description: 'Tracks competitor activities and product updates',
-        task_prompt: 'Monitor and report on competitor activities, product launches, pricing changes, and strategic moves. Focus on companies in the AI/ML space and provide actionable insights.',
-        schedule: 'daily' as const,
-        category: 'monitoring',
-        model: 'llama3-8b-8192',
-        complexity: 'medium' as const
+        complexity: 'high'
       },
       {
         id: 'content-curator',
         name: 'Content Curator',
-        description: 'Curates relevant content and articles for your industry',
-        task_prompt: 'Curate and summarize the most relevant articles, blog posts, and research papers in the AI and machine learning space. Focus on practical insights and actionable content.',
-        schedule: 'daily' as const,
+        description: 'Curate and organize relevant content',
+        task_prompt: 'Curate high-quality content about {topic}. Identify the most valuable resources, articles, and insights. Provide summaries and organize them by relevance and importance.',
+        schedule: 'daily',
         category: 'content',
         model: 'llama3-8b-8192',
-        complexity: 'low' as const
+        complexity: 'medium'
       },
       {
-        id: 'social-media-monitor',
-        name: 'Social Media Monitor',
-        description: 'Monitors social media for brand mentions and sentiment',
-        task_prompt: 'Monitor social media platforms for mentions of our brand and competitors. Analyze sentiment, identify trending topics, and report on key conversations in our industry.',
-        schedule: 'hourly' as const,
+        id: 'research-assistant',
+        name: 'Research Assistant',
+        description: 'Conduct comprehensive research on any topic',
+        task_prompt: 'Conduct thorough research on {topic}. Provide a comprehensive analysis including background, current state, key findings, and future implications. Include relevant data and sources.',
+        schedule: 'weekly',
+        category: 'research',
+        model: 'llama3-8b-8192',
+        complexity: 'high'
+      },
+      {
+        id: 'trend-monitor',
+        name: 'Trend Monitor',
+        description: 'Monitor and analyze emerging trends',
+        task_prompt: 'Monitor and analyze emerging trends in {industry/field}. Identify new developments, technologies, and patterns. Provide insights on potential opportunities and risks.',
+        schedule: 'daily',
         category: 'monitoring',
         model: 'llama3-8b-8192',
-        complexity: 'medium' as const
+        complexity: 'medium'
+      },
+      {
+        id: 'strategy-advisor',
+        name: 'Strategy Advisor',
+        description: 'Provide strategic advice and planning',
+        task_prompt: 'Develop a comprehensive strategy for {business/initiative}. Include market analysis, competitive positioning, growth opportunities, and implementation roadmap with actionable steps.',
+        schedule: 'weekly',
+        category: 'strategy',
+        model: 'llama3-8b-8192',
+        complexity: 'high'
       }
     ]
   }

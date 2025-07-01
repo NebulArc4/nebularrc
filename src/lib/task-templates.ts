@@ -20,7 +20,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Conduct a comprehensive market research analysis for {topic}. Include market size, key players, trends, opportunities, and threats. Provide actionable insights and recommendations.',
     complexity: 'high',
     estimatedTokens: 800,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['research', 'market', 'analysis', 'business']
   },
   {
@@ -31,7 +31,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Perform a detailed competitor analysis for {company/product}. Identify main competitors, their strengths, weaknesses, market positioning, and strategic recommendations.',
     complexity: 'medium',
     estimatedTokens: 600,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['research', 'competitors', 'strategy', 'business']
   },
 
@@ -44,7 +44,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Create engaging content about {topic} for {platform}. The content should be informative, engaging, and optimized for the target audience. Include a compelling headline and key points.',
     complexity: 'medium',
     estimatedTokens: 500,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['creative', 'content', 'marketing', 'writing']
   },
   {
@@ -55,7 +55,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Create a comprehensive blog post outline for "{topic}". Include an attention-grabbing headline, introduction, main sections with subheadings, and a compelling conclusion.',
     complexity: 'low',
     estimatedTokens: 300,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['creative', 'blog', 'writing', 'outline']
   },
 
@@ -68,7 +68,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Review the following code for {language}: {code}. Analyze code quality, identify potential issues, suggest improvements, and provide best practices recommendations.',
     complexity: 'high',
     estimatedTokens: 700,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['technical', 'code', 'review', 'programming']
   },
   {
@@ -79,7 +79,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Design a scalable system architecture for {system_description}. Include system components, data flow, scalability considerations, and technology recommendations.',
     complexity: 'high',
     estimatedTokens: 900,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['technical', 'architecture', 'design', 'scalability']
   },
 
@@ -92,7 +92,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Develop a comprehensive business strategy for {business/idea}. Include market analysis, competitive advantage, revenue model, growth strategy, and implementation roadmap.',
     complexity: 'high',
     estimatedTokens: 1000,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['strategy', 'business', 'planning', 'growth']
   },
   {
@@ -103,7 +103,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Create a comprehensive marketing strategy for {product/service}. Include target audience, positioning, channels, messaging, and campaign recommendations.',
     complexity: 'medium',
     estimatedTokens: 600,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['strategy', 'marketing', 'campaign', 'audience']
   },
 
@@ -116,7 +116,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Create a comprehensive data analysis plan for {dataset/topic}. Include research questions, methodology, key metrics, visualization recommendations, and expected insights.',
     complexity: 'medium',
     estimatedTokens: 500,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['analysis', 'data', 'research', 'metrics']
   },
   {
@@ -127,7 +127,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Analyze current trends in {industry/field}. Identify key drivers, emerging patterns, future predictions, and strategic implications for businesses.',
     complexity: 'medium',
     estimatedTokens: 600,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['analysis', 'trends', 'industry', 'prediction']
   },
 
@@ -140,7 +140,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Provide a concise, well-structured summary of {topic}. Include key points, main takeaways, and actionable insights in a clear, professional format.',
     complexity: 'low',
     estimatedTokens: 200,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['summary', 'quick', 'overview']
   },
   {
@@ -151,7 +151,7 @@ export const taskTemplates: TaskTemplate[] = [
     prompt: 'Apply systematic problem-solving approach to {problem}. Break down the problem, identify root causes, explore solutions, and recommend the best approach with implementation steps.',
     complexity: 'medium',
     estimatedTokens: 500,
-    suggestedModel: 'gpt2',
+    suggestedModel: 'llama3-8b-8192',
     tags: ['problem-solving', 'analysis', 'solutions']
   }
 ]

@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       schedule,
       custom_schedule,
       category: category || 'other',
-      model: model || 'mock-ai-v1',
+      model: model || 'llama3-8b-8192',
       complexity: complexity || 'medium',
       is_active: true
     })

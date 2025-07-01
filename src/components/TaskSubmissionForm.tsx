@@ -55,7 +55,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         },
         body: JSON.stringify({
           task_prompt: taskPrompt,
-          model: selectedModel?.id || 'mock-ai-v1',
+          model: selectedModel?.id || 'llama3-8b-8192',
           category: selectedTemplate?.category || 'other',
           complexity: selectedTemplate?.complexity || 'medium',
           estimated_tokens: selectedTemplate?.estimatedTokens || 500,

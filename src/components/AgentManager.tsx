@@ -34,7 +34,7 @@ export default function AgentManager() {
     schedule: 'daily' as 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom',
     custom_schedule: '',
     category: 'other',
-    model: 'mock-ai-v1',
+    model: 'llama3-8b-8192',
     complexity: 'medium' as 'low' | 'medium' | 'high'
   })
 
@@ -90,7 +90,7 @@ export default function AgentManager() {
           schedule: 'daily',
           custom_schedule: '',
           category: 'other',
-          model: 'mock-ai-v1',
+          model: 'llama3-8b-8192',
           complexity: 'medium'
         })
         fetchAgents()
@@ -306,54 +306,6 @@ export default function AgentManager() {
       .replace(/\n/g, '<br>')
   }
 
-  function parseNewsMarkdown(markdown: string) {
-    try {
-      // Try to parse as JSON first
-      const parsed = JSON.parse(markdown)
-      if (parsed.articles && Array.isArray(parsed.articles)) {
-        return parsed
-      }
-    } catch (e) {
-      // Not JSON, continue with markdown parsing
-    }
-
-    // Simple markdown parsing for news format
-    const lines = markdown.split('\n')
-    const result = {
-      aiSummary: '',
-      articles: [] as any[]
-    }
-
-    let currentArticle: any = {}
-    let inArticle = false
-
-    for (const line of lines) {
-      if (line.startsWith('## AI Summary:')) {
-        result.aiSummary = line.replace('## AI Summary:', '').trim()
-      } else if (line.startsWith('### ')) {
-        if (inArticle && currentArticle.title) {
-          result.articles.push(currentArticle)
-        }
-        currentArticle = { title: line.replace('### ', '').trim() }
-        inArticle = true
-      } else if (line.startsWith('**Source:**') && inArticle) {
-        currentArticle.source = line.replace('**Source:**', '').trim()
-      } else if (line.startsWith('**URL:**') && inArticle) {
-        currentArticle.url = line.replace('**URL:**', '').trim()
-      } else if (line.startsWith('**Image:**') && inArticle) {
-        currentArticle.image = line.replace('**Image:**', '').trim()
-      } else if (line.trim() && inArticle && !currentArticle.summary) {
-        currentArticle.summary = line.trim()
-      }
-    }
-
-    if (inArticle && currentArticle.title) {
-      result.articles.push(currentArticle)
-    }
-
-    return result.articles.length > 0 ? result : null
-  }
-
   function parseAgentRunResult(result: string) {
     try {
       // Try to parse as JSON first
@@ -362,8 +314,8 @@ export default function AgentManager() {
         return parsed
       }
     } catch (e) {
-      // Not JSON, try markdown parsing
-      return parseNewsMarkdown(result)
+      // Not JSON, return null for simple text display
+      return null
     }
     return null
   }

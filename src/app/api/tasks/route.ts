@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
         category: category || 'other',
         complexity: complexity || 'medium',
         estimated_tokens: estimated_tokens || 500,
-        suggested_model: model || 'mock-ai-v1',
-        model_used: model || 'mock-ai-v1'
+              suggested_model: model || 'llama3-8b-8192',
+      model_used: model || 'llama3-8b-8192'
       })
       .select()
       .single()
