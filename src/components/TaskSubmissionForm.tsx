@@ -7,6 +7,7 @@ import { modelManager, AIModel } from '@/lib/model-manager'
 import toast, { Toaster } from 'react-hot-toast'
 import jsPDF from 'jspdf'
 import * as pdfjsLib from 'pdfjs-dist'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 // Fix for Next.js: set workerSrc to CDN
 if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
@@ -150,6 +151,31 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
     const doc = new jsPDF()
     doc.text(result, 10, 10)
     doc.save('ai-task-result.pdf')
+  }
+
+  const handleDownloadAnnotatedPDF = async () => {
+    if (!result || !pdfFile) return
+    const existingPdfBytes = await pdfFile.arrayBuffer()
+    const pdfDoc = await PDFDocument.load(existingPdfBytes)
+    const page = pdfDoc.addPage()
+    const { width, height } = page.getSize()
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontSize = 12
+    const lines = result.split('\n')
+    let y = height - 40
+    for (const line of lines) {
+      page.drawText(line, { x: 40, y, size: fontSize, font, color: rgb(0, 0, 0) })
+      y -= fontSize + 4
+      if (y < 40) break // avoid overflow
+    }
+    const pdfBytes = await pdfDoc.save()
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'annotated-result.pdf'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const filteredTemplates = selectedCategory === 'all' 
@@ -430,6 +456,12 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
               Download as PDF
             </button>
           </div>
+          <button
+            onClick={handleDownloadAnnotatedPDF}
+            className="text-gray-400 hover:text-white text-sm"
+          >
+            Download Annotated PDF
+          </button>
           <pre className="text-gray-300 text-sm">{result}</pre>
         </div>
       )}
