@@ -5,6 +5,7 @@ import { User } from '@supabase/supabase-js'
 import { taskTemplates, getTemplatesByCategory, getCategories, TaskTemplate } from '@/lib/task-templates'
 import { modelManager, AIModel } from '@/lib/model-manager'
 import toast, { Toaster } from 'react-hot-toast'
+import jsPDF from 'jspdf'
 
 interface TaskSubmissionFormProps {
   user: User
@@ -20,6 +21,9 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   const [showModelSelector, setShowModelSelector] = useState(false)
   const [loading, setLoading] = useState(false)
   const [templateSearch, setTemplateSearch] = useState('')
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [linkInput, setLinkInput] = useState('')
+  const [result, setResult] = useState<string | null>(null)
 
   const taskTypes = [
     { id: 'general', name: 'General', description: 'General AI assistance' },
@@ -47,6 +51,26 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
     setShowTemplates(false)
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setPdfFile(file)
+    if (file) {
+      const text = await extractTextFromPDF(file)
+      setTaskPrompt(text)
+    }
+  }
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer()
+    // Use pdf-parse on the server for more robust extraction, but for demo, use pdfjs-dist or similar client-side
+    // For now, just return a placeholder
+    return '[PDF text extraction not implemented in browser]'
+  }
+
+  const handleLinkInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLinkInput(e.target.value)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -57,6 +81,11 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
       return
     }
 
+    let inputPrompt = taskPrompt.trim()
+    if (linkInput) {
+      inputPrompt = `LINK:${linkInput}`
+    }
+
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -64,18 +93,22 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          task_prompt: taskPrompt,
+          task_prompt: inputPrompt,
           model: selectedModel?.id || 'llama3-8b-8192',
           category: selectedTemplate?.category || 'other',
           complexity: selectedTemplate?.complexity || 'medium',
           estimated_tokens: selectedTemplate?.estimatedTokens || 500,
           task_type: selectedTaskType,
+          pdf: pdfFile ? true : false,
+          link: linkInput || undefined
         }),
       })
 
       if (response.ok) {
         setTaskPrompt('')
         setSelectedTemplate(null)
+        const data = await response.json()
+        setResult(data.task?.result || null)
         toast.success('Task submitted successfully!')
       } else {
         const error = await response.json()
@@ -86,6 +119,13 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDownloadPDF = () => {
+    if (!result) return
+    const doc = new jsPDF()
+    doc.text(result, 10, 10)
+    doc.save('ai-task-result.pdf')
   }
 
   const filteredTemplates = selectedCategory === 'all' 
@@ -305,6 +345,49 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           ) : 'Submit Task'}
         </button>
       </form>
+
+      {/* File input for PDF */}
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Upload PDF
+        </label>
+        <input
+          type="file"
+          accept=".pdf"
+          onChange={handleFileChange}
+          className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+        />
+      </div>
+
+      {/* Input for link */}
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Enter Link
+        </label>
+        <input
+          type="text"
+          value={linkInput}
+          onChange={handleLinkInput}
+          className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+          placeholder="Enter a link..."
+        />
+      </div>
+
+      {/* Result area */}
+      {result && (
+        <div className="mt-4 p-3 bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-[#6366f1] font-semibold">Task Result</h4>
+            <button
+              onClick={handleDownloadPDF}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Download as PDF
+            </button>
+          </div>
+          <pre className="text-gray-300 text-sm">{result}</pre>
+        </div>
+      )}
     </div>
   )
 }

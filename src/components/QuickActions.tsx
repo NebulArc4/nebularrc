@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { User } from '@supabase/supabase-js'
+import jsPDF from 'jspdf'
 
 interface QuickActionsProps {
   user: User
@@ -22,6 +23,8 @@ export default function QuickActions({ user }: QuickActionsProps) {
   const [content, setContent] = useState('')
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [linkInput, setLinkInput] = useState('')
 
   const quickActions: QuickAction[] = [
     {
@@ -74,6 +77,26 @@ export default function QuickActions({ user }: QuickActionsProps) {
     }
   ]
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setPdfFile(file)
+    if (file) {
+      const text = await extractTextFromPDF(file)
+      setContent(text)
+    }
+  }
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer()
+    // Use pdf-parse on the server for more robust extraction, but for demo, use pdfjs-dist or similar client-side
+    // For now, just return a placeholder
+    return '[PDF text extraction not implemented in browser]'
+  }
+
+  const handleLinkInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLinkInput(e.target.value)
+  }
+
   const handleQuickAction = async (action: QuickAction) => {
     if (!content.trim()) {
       setError('Please enter some content to process')
@@ -84,6 +107,11 @@ export default function QuickActions({ user }: QuickActionsProps) {
     setError(null)
     setResult(null)
 
+    let inputContent = content.trim()
+    if (linkInput) {
+      inputContent = `LINK:${linkInput}`
+    }
+
     try {
       const response = await fetch('/api/quick-actions', {
         method: 'POST',
@@ -92,8 +120,10 @@ export default function QuickActions({ user }: QuickActionsProps) {
         },
         body: JSON.stringify({
           actionType: action.id,
-          content: content.trim(),
-          context: `Processing ${action.title.toLowerCase()} request`
+          content: inputContent,
+          context: `Processing ${action.title.toLowerCase()} request`,
+          pdf: pdfFile ? true : false,
+          link: linkInput || undefined
         }),
       })
 
@@ -116,9 +146,18 @@ export default function QuickActions({ user }: QuickActionsProps) {
     setContent('')
     setResult(null)
     setError(null)
+    setPdfFile(null)
+    setLinkInput('')
   }
 
   const selectedActionData = quickActions.find(action => action.id === selectedAction)
+
+  const handleDownloadPDF = () => {
+    if (!result) return
+    const doc = new jsPDF()
+    doc.text(result, 10, 10)
+    doc.save('ai-result.pdf')
+  }
 
   return (
     <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
@@ -191,6 +230,15 @@ export default function QuickActions({ user }: QuickActionsProps) {
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Result</h4>
               <div className="text-sm text-gray-300 whitespace-pre-wrap max-h-60 overflow-y-auto">
                 {result}
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="px-4 py-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#5b5beb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!result}
+                >
+                  Download as PDF
+                </button>
               </div>
             </div>
           )}

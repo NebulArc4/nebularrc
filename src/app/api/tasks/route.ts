@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 import { aiService } from '@/lib/ai-service'
+import fetch from 'node-fetch'
+import pdfParse from 'pdf-parse'
 
 // Choose which AI service to use based on environment
 const activeAIService = aiService
@@ -49,26 +51,34 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/tasks: Processing request for user:', user.id)
 
     const body = await request.json()
-    const { task_prompt, model, category, complexity, estimated_tokens, task_type } = body
+    const { task_prompt, model, category, complexity, estimated_tokens, task_type, pdf, link } = body
+    let inputPrompt = task_prompt
+    if (link) {
+      // Fetch link content
+      const res = await fetch(link)
+      const html = await res.text()
+      // Simple extraction: strip HTML tags
+      inputPrompt = html.replace(/<[^>]+>/g, ' ')
+    }
 
-    if (!task_prompt || !task_prompt.trim()) {
+    if (!inputPrompt || !inputPrompt.trim()) {
       return NextResponse.json({ error: 'Task prompt is required' }, { status: 400 })
     }
 
-    console.log('POST /api/tasks: Creating task with prompt:', task_prompt.substring(0, 50) + '...')
+    console.log('POST /api/tasks: Creating task with prompt:', inputPrompt.substring(0, 50) + '...')
 
     // Create the task
     const { data: task, error: createError } = await supabase
       .from('tasks')
       .insert({
         user_id: user.id,
-        task_prompt: task_prompt.trim(),
+        task_prompt: inputPrompt.trim(),
         status: 'pending',
         category: category || 'other',
         complexity: complexity || 'medium',
         estimated_tokens: estimated_tokens || 500,
-              suggested_model: model || 'llama3-8b-8192',
-      model_used: model || 'llama3-8b-8192'
+        suggested_model: model || 'llama3-8b-8192',
+        model_used: model || 'llama3-8b-8192'
       })
       .select()
       .single()

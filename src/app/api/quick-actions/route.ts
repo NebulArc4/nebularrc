@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 import { aiService } from '@/lib/ai-service'
+import fetch from 'node-fetch'
+import pdfParse from 'pdf-parse'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { actionType, content, context } = await request.json()
+    const { actionType, content, context, pdf, link } = await request.json()
 
     if (!actionType || !content) {
       return NextResponse.json(
@@ -21,10 +23,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let finalContent = content
+    if (link) {
+      // Fetch link content
+      const res = await fetch(link)
+      const html = await res.text()
+      // Simple extraction: strip HTML tags
+      finalContent = html.replace(/<[^>]+>/g, ' ')
+    }
+
     // Process the quick action with Groq AI
     const result = await aiService.processQuickAction({
       actionType,
-      content,
+      content: finalContent,
       userId: user.id,
       context
     })

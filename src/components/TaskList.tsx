@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import jsPDF from 'jspdf'
 
 interface Task {
   id: string
@@ -253,6 +254,13 @@ export default function TaskList({ userId }: { userId: string }) {
     return prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt
   }
 
+  const handleDownloadPDF = (result?: string) => {
+    if (!result) return
+    const doc = new jsPDF()
+    doc.text(result, 10, 10)
+    doc.save('task-result.pdf')
+  }
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
@@ -430,6 +438,12 @@ export default function TaskList({ userId }: { userId: string }) {
                           className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-3 rounded border prose prose-sm max-w-none"
                           dangerouslySetInnerHTML={{ __html: renderMarkdown(task.result) }}
                         />
+                        <button
+                          onClick={() => handleDownloadPDF(task.result)}
+                          className="text-blue-500 hover:text-blue-600 text-sm mt-2"
+                        >
+                          Download as PDF
+                        </button>
                       </div>
                     )}
 
