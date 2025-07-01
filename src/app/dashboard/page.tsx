@@ -10,6 +10,7 @@ import AgentManager from '@/components/AgentManager'
 import QuickActions from '@/components/QuickActions'
 import RecentActivity from '@/components/RecentActivity'
 import AIInsights from '@/components/AIInsights'
+import AITaskRecommendations from '@/components/AITaskRecommendations'
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic'
@@ -201,6 +202,11 @@ export default async function DashboardPage() {
               {/* Quick Actions Section */}
               <div className="mb-8">
                 <QuickActions user={user} />
+              </div>
+
+              {/* AI Task Recommendations */}
+              <div className="mb-8">
+                <AITaskRecommendations user={user} />
               </div>
 
               {/* Enhanced Stats Cards */}

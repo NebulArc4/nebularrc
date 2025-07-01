@@ -15,10 +15,20 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedTaskType, setSelectedTaskType] = useState<string>('general')
   const [showTemplates, setShowTemplates] = useState(false)
   const [showModelSelector, setShowModelSelector] = useState(false)
   const [loading, setLoading] = useState(false)
   const [templateSearch, setTemplateSearch] = useState('')
+
+  const taskTypes = [
+    { id: 'general', name: 'General', description: 'General AI assistance' },
+    { id: 'analysis', name: 'Data Analysis', description: 'Analyze data and provide insights' },
+    { id: 'summarization', name: 'Summarization', description: 'Create concise summaries' },
+    { id: 'translation', name: 'Translation', description: 'Translate between languages' },
+    { id: 'code_review', name: 'Code Review', description: 'Review and improve code' },
+    { id: 'insights', name: 'Insights', description: 'Generate insights and recommendations' }
+  ]
 
   const categories = getCategories()
   const availableModels = modelManager.getAvailableModels()
@@ -59,6 +69,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           category: selectedTemplate?.category || 'other',
           complexity: selectedTemplate?.complexity || 'medium',
           estimated_tokens: selectedTemplate?.estimatedTokens || 500,
+          task_type: selectedTaskType,
         }),
       })
 
@@ -107,6 +118,28 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           >
             {showModelSelector ? 'Hide' : 'Show'} Models
           </button>
+        </div>
+      </div>
+
+      {/* Task Type Selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">Task Type</label>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {taskTypes.map(taskType => (
+            <button
+              key={taskType.id}
+              type="button"
+              onClick={() => setSelectedTaskType(taskType.id)}
+              className={`p-3 rounded-lg border transition-colors text-left ${
+                selectedTaskType === taskType.id
+                  ? 'bg-[#6366f1]/20 border-[#6366f1] text-white'
+                  : 'bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-800/70'
+              }`}
+            >
+              <div className="font-medium text-sm">{taskType.name}</div>
+              <div className="text-xs text-gray-400 mt-1">{taskType.description}</div>
+            </button>
+          ))}
         </div>
       </div>
 

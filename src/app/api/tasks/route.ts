@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/tasks: Processing request for user:', user.id)
 
     const body = await request.json()
-    const { task_prompt, model, category, complexity, estimated_tokens } = body
+    const { task_prompt, model, category, complexity, estimated_tokens, task_type } = body
 
     if (!task_prompt || !task_prompt.trim()) {
       return NextResponse.json({ error: 'Task prompt is required' }, { status: 400 })
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
         const aiResponse = await aiService.processTask({
           taskId: task.id,
           prompt: task.task_prompt,
-          userId: user.id
+          userId: user.id,
+          taskType: task_type || 'general'
         })
 
         console.log('POST /api/tasks: AI processing completed:', aiResponse.status)
