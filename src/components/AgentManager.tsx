@@ -17,6 +17,7 @@ interface AgentTemplate {
 
 export default function AgentManager() {
   const [agents, setAgents] = useState<Agent[]>([])
+  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -25,6 +26,10 @@ export default function AgentManager() {
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set())
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'name' | 'status' | 'last_run' | 'complexity'>('name')
 
   // Form state
   const [formData, setFormData] = useState({
@@ -45,12 +50,64 @@ export default function AgentManager() {
     fetchTemplates()
   }, [])
 
+  // Filter and sort agents based on search query, status filter, category filter, and sort preference
+  useEffect(() => {
+    let filtered = agents
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(agent =>
+        agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.task_prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.category.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(agent => {
+        if (statusFilter === 'active') return agent.is_active
+        if (statusFilter === 'inactive') return !agent.is_active
+        return true
+      })
+    }
+
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(agent => agent.category === categoryFilter)
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name)
+        case 'status':
+          return (a.is_active ? 0 : 1) - (b.is_active ? 0 : 1)
+        case 'last_run':
+          const aLastRun = a.last_run ? new Date(a.last_run).getTime() : 0
+          const bLastRun = b.last_run ? new Date(b.last_run).getTime() : 0
+          return bLastRun - aLastRun
+        case 'complexity':
+          const complexityOrder = { 'low': 0, 'medium': 1, 'high': 2 }
+          return (complexityOrder[a.complexity as keyof typeof complexityOrder] || 3) - (complexityOrder[b.complexity as keyof typeof complexityOrder] || 3)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredAgents(filtered)
+  }, [agents, searchQuery, statusFilter, categoryFilter, sortBy])
+
   const fetchAgents = async () => {
     try {
       const response = await fetch('/api/agents')
       if (response.ok) {
         const data = await response.json()
-        setAgents(Array.isArray(data) ? data : [])
+        const agentsData = Array.isArray(data) ? data : []
+        setAgents(agentsData)
+        setFilteredAgents(agentsData)
       }
     } catch (error) {
       console.error('Error fetching agents:', error)
@@ -69,6 +126,13 @@ export default function AgentManager() {
     } catch (error) {
       console.error('Error fetching templates:', error)
     }
+  }
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setCategoryFilter('all')
+    setSortBy('name')
   }
 
   const handleCreateAgent = async (e: React.FormEvent) => {
@@ -198,7 +262,7 @@ export default function AgentManager() {
   // Real-time subscription for agent runs
   useEffect(() => {
     if (!selectedAgent) return
-    fetchAgentRuns(selectedAgent.id)
+
     const channel = supabase.channel('realtime-agent-runs')
       .on(
         'postgres_changes',
@@ -209,10 +273,12 @@ export default function AgentManager() {
           filter: `agent_id=eq.${selectedAgent.id}`
         },
         (payload) => {
+          // On any change, re-fetch agent runs
           fetchAgentRuns(selectedAgent.id)
         }
       )
       .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
     }
@@ -220,10 +286,11 @@ export default function AgentManager() {
 
   const handleTemplateSelect = (template: AgentTemplate) => {
     setFormData({
-      ...formData,
       name: template.name,
       description: template.description,
       task_prompt: template.task_prompt,
+      schedule: template.schedule,
+      custom_schedule: '',
       category: template.category,
       model: template.model,
       complexity: template.complexity
@@ -236,8 +303,10 @@ export default function AgentManager() {
     switch (status) {
       case 'completed':
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-      case 'running':
+      case 'in_progress':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+      case 'pending':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
       case 'failed':
         return 'bg-red-500/10 text-red-400 border-red-500/20'
       default:
@@ -245,20 +314,74 @@ export default function AgentManager() {
     }
   }
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      case 'running':
+        return (
+          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        )
+      case 'pending':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      case 'failed':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      default:
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        )
+    }
+  }
+
   const getScheduleIcon = (schedule: string) => {
     switch (schedule) {
       case 'hourly':
-        return '🕐'
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
       case 'daily':
-        return '📅'
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )
       case 'weekly':
-        return '📆'
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        )
       case 'monthly':
-        return '🗓️'
-      case 'custom':
-        return '⚙️'
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )
       default:
-        return '📋'
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        )
     }
   }
 
@@ -308,445 +431,437 @@ export default function AgentManager() {
 
   function parseAgentRunResult(result: string) {
     try {
-      // Try to parse as JSON first
-      const parsed = JSON.parse(result)
-      if (parsed.articles && Array.isArray(parsed.articles)) {
-        return parsed
-      }
-    } catch (e) {
-      // Not JSON, return null for simple text display
-      return null
+      return JSON.parse(result)
+    } catch {
+      return { content: result }
     }
-    return null
   }
 
   const getRunPreview = (run: AgentRun): string => {
-    if (run.result) {
-      const news = parseAgentRunResult(run.result)
-      if (news && news.articles.length > 0) {
-        return `Generated ${news.articles.length} news articles${news.aiSummary ? ' with AI summary' : ''}`
-      }
-      // Return first 100 characters of result
-      return run.result.length > 100 ? run.result.substring(0, 100) + '...' : run.result
-    } else if (run.error_message) {
-      return `Error: ${run.error_message}`
-    }
-    
-    return 'No content available'
+    const result = parseAgentRunResult(run.result || '')
+    const content = result.content || result.text || result.message || run.result || ''
+    return content.length > 100 ? content.substring(0, 100) + '...' : content
   }
 
   if (loading) {
     return (
-      <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
-        <div className="flex items-center justify-center py-6">
-          <svg className="animate-spin h-6 w-6 text-[#6366f1]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">AI Agents</h2>
-            <p className="text-gray-400 text-xs">Automated AI agents that run on schedule</p>
+    <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+      {/* Search and Filter Header */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI Agents</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => fetchAgents()}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              title="Refresh agents"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            {(searchQuery || statusFilter !== 'all' || categoryFilter !== 'all') && (
+              <button
+                onClick={clearFilters}
+                className="px-3 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="px-3 py-2 bg-gray-100 dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-[#333] transition-colors text-sm"
+            >
+              Templates
+            </button>
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="px-3 py-2 bg-blue-600 dark:bg-[#6366f1] text-white rounded-lg hover:bg-blue-700 dark:hover:bg-[#5b5beb] transition-colors text-sm"
+            >
+              Create Agent
+            </button>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowTemplates(!showTemplates)}
-            className="px-3 py-1 text-xs bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded transition-colors"
+
+        {/* Search Bar */}
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search agents by name, description, or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3">
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white text-sm"
           >
-            {showTemplates ? 'Hide' : 'Show'} Templates
-          </button>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-3 py-1 text-xs bg-[#6366f1] hover:bg-[#6366f1]/80 text-white rounded transition-colors"
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white text-sm"
           >
-            {showCreateForm ? 'Cancel' : 'Create Agent'}
-          </button>
+            <option value="all">All Categories</option>
+            <option value="data-analysis">Data Analysis</option>
+            <option value="content-generation">Content Generation</option>
+            <option value="automation">Automation</option>
+            <option value="monitoring">Monitoring</option>
+            <option value="other">Other</option>
+          </select>
+
+          {/* Sort By */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'status' | 'last_run' | 'complexity')}
+            className="px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white text-sm"
+          >
+            <option value="name">Sort by Name</option>
+            <option value="status">Sort by Status</option>
+            <option value="last_run">Sort by Last Run</option>
+            <option value="complexity">Sort by Complexity</option>
+          </select>
+
+          {/* Results Count */}
+          <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            {filteredAgents.length} of {agents.length} agents
+          </div>
         </div>
       </div>
 
-      {/* Templates */}
-      {showTemplates && (
-        <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-          <h4 className="text-white font-semibold mb-3">Agent Templates</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {templates.map(template => (
-              <div
-                key={template.id}
-                onClick={() => handleTemplateSelect(template)}
-                className="p-3 bg-gray-700/50 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700/70 transition-colors"
-              >
-                <h5 className="text-white font-medium text-sm mb-1">{template.name}</h5>
-                <p className="text-gray-400 text-xs mb-2">{template.description}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{template.category}</span>
-                  <span>{template.complexity}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Create Agent Form */}
-      {showCreateForm && (
-        <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-          <h4 className="text-white font-semibold mb-3">Create New Agent</h4>
-          <form onSubmit={handleCreateAgent} className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                type="text"
-                placeholder="Agent Name"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-                required
-              />
-              <select
-                value={formData.schedule}
-                onChange={(e) => setFormData({...formData, schedule: e.target.value as any})}
-                className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-              >
-                <option value="hourly">Hourly</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <input
-              type="text"
-              placeholder="Description"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-            />
-            <textarea
-              placeholder="Task Prompt (what should the agent do?)"
-              value={formData.task_prompt}
-              onChange={(e) => setFormData({...formData, task_prompt: e.target.value})}
-              rows={3}
-              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-              required
-            />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-              >
-                <option value="news">News</option>
-                <option value="analysis">Analysis</option>
-                <option value="monitoring">Monitoring</option>
-                <option value="content">Content</option>
-                <option value="other">Other</option>
-              </select>
-              <select
-                value={formData.complexity}
-                onChange={(e) => setFormData({...formData, complexity: e.target.value as any})}
-                className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white rounded-lg transition-colors"
-              >
-                Create Agent
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Agents List */}
-      <div className="space-y-3">
-        {agents.length === 0 ? (
-          <div className="text-center py-8">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      {/* Agent List */}
+      {filteredAgents.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-[#2a2a2a] rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-300">No agents yet</h3>
-            <p className="mt-1 text-xs text-gray-500">Create your first AI agent to automate tasks 24/7.</p>
           </div>
-        ) : (
-          agents.map(agent => (
-            <div key={agent.id} className="bg-[#0a0a0a] rounded-lg border border-[#333] p-4 hover:bg-[#1a1a1a] transition-all duration-200">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="text-white font-semibold">{agent.name}</h3>
-                    <span className={`px-2 py-1 text-xs rounded-full border ${
-                      agent.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                    }`}>
-                      {agent.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <span className="px-2 py-1 bg-[#333] rounded text-xs text-gray-300">
-                      {agent.category}
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mb-2">{agent.description}</p>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>{getScheduleIcon(agent.schedule)} {agent.schedule}</span>
-                    <span>Runs: {agent.total_runs}</span>
-                    {agent.last_run && (
-                      <span>Last: {new Date(agent.last_run).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleRunAgent(agent.id)}
-                    disabled={runningAgents.has(agent.id)}
-                    className="px-2 py-1 text-xs bg-[#3b82f6]/20 hover:bg-[#3b82f6]/30 text-[#3b82f6] rounded transition-colors disabled:opacity-50"
-                  >
-                    {runningAgents.has(agent.id) ? 'Running...' : 'Run Now'}
-                  </button>
-                  <button
-                    onClick={() => handleToggleAgent(agent.id, !agent.is_active)}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' ? 'No agents found' : 'No agents yet'}
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all'
+              ? 'Try adjusting your search or filters' 
+              : 'Create your first agent to get started'
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredAgents.map((agent) => (
+            <div
+              key={agent.id}
+              className="bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden"
+            >
+              {/* Agent Header */}
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
                       agent.is_active 
-                        ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
-                        : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                    }`}
-                  >
-                    {agent.is_active ? 'Pause' : 'Start'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (selectedAgent?.id === agent.id) {
-                        setSelectedAgent(null)
-                        setAgentRuns([])
-                        setExpandedRuns(new Set())
-                      } else {
-                        setSelectedAgent(agent)
-                        fetchAgentRuns(agent.id)
-                      }
-                    }}
-                    className="px-2 py-1 text-xs bg-gray-500/20 hover:bg-gray-500/30 text-gray-400 rounded transition-colors"
-                  >
-                    {selectedAgent?.id === agent.id ? 'Hide' : 'View'} Runs
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAgent(agent.id)}
-                    className="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
-                  >
-                    Delete
-                  </button>
+                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                        : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                    }`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {agent.name}
+                        </h3>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                          agent.is_active 
+                            ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                            : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                        }`}>
+                          {agent.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {agent.description}
+                      </p>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {agent.category}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {agent.complexity} complexity
+                        </span>
+                        {agent.last_run && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Last run: {new Date(agent.last_run).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleRunAgent(agent.id)}
+                      disabled={runningAgents.has(agent.id)}
+                      className="px-3 py-1 text-xs bg-blue-600 dark:bg-[#6366f1] text-white rounded hover:bg-blue-700 dark:hover:bg-[#5b5beb] disabled:opacity-50 transition-colors"
+                    >
+                      {runningAgents.has(agent.id) ? 'Running...' : 'Run'}
+                    </button>
+                    <button
+                      onClick={() => handleToggleAgent(agent.id, !agent.is_active)}
+                      className={`px-3 py-1 text-xs rounded transition-colors ${
+                        agent.is_active
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {agent.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      onClick={() => setSelectedAgent(selectedAgent?.id === agent.id ? null : agent)}
+                      className="px-3 py-1 text-xs bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-[#444] transition-colors"
+                    >
+                      {selectedAgent?.id === agent.id ? 'Hide Runs' : 'View Runs'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAgent(agent.id)}
+                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Agent Runs */}
+              {/* Agent Runs (Expanded) */}
               {selectedAgent?.id === agent.id && (
-                <div className="mt-6 pt-6 border-t border-[#333]">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-white font-semibold text-lg">Execution History</h4>
-                    <span className="text-gray-400 text-sm">Last 10 runs</span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {agentRuns.length === 0 ? (
-                      <div className="text-center py-8 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-gray-700/50 rounded-full flex items-center justify-center">
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                        </div>
-                        <h5 className="text-gray-300 font-medium mb-1">No executions yet</h5>
-                        <p className="text-gray-500 text-sm">Click "Run Now" to start your first execution</p>
-                      </div>
-                    ) : (
-                      agentRuns.map((run, index) => {
-                        const isExpanded = expandedRuns.has(run.id)
-                        const isLatest = index === 0
-                        
-                        return (
-                          <div key={run.id} className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-gray-600/50 transition-all duration-200">
-                            {/* Run Header - Always Visible */}
-                            <div 
-                              className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/30 cursor-pointer hover:bg-gray-800/50 transition-colors"
-                              onClick={() => toggleRunExpansion(run.id)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    run.status === 'completed' ? 'bg-emerald-400' :
-                                    run.status === 'running' ? 'bg-blue-400 animate-pulse' :
-                                    run.status === 'failed' ? 'bg-red-400' :
-                                    'bg-gray-400'
-                                  }`}></div>
-                                  <span className={`text-sm font-medium ${
-                                    run.status === 'completed' ? 'text-emerald-300' :
-                                    run.status === 'running' ? 'text-blue-300' :
-                                    run.status === 'failed' ? 'text-red-300' :
-                                    'text-gray-300'
-                                  }`}>
-                                    {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                                  </span>
-                                  {isLatest && (
-                                    <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 rounded-md">
-                                      Latest
-                                    </span>
-                                  )}
-                                  {run.model_used && (
-                                    <span className="px-2 py-1 text-xs bg-gray-700/50 text-gray-400 rounded-md">
-                                      {run.model_used}
-                                    </span>
-                                  )}
+                <div className="border-t border-gray-200 dark:border-[#444] p-4 bg-white dark:bg-[#1f1f1f]">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Recent Runs</h4>
+                  {agentRuns.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No runs yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {agentRuns.map((run) => (
+                        <div key={run.id} className="bg-gray-50 dark:bg-[#2a2a2a] rounded border border-gray-200 dark:border-[#444] overflow-hidden">
+                          <div
+                            className="p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                            onClick={() => toggleRunExpansion(run.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${getStatusColor(run.status)}`}>
+                                  {getStatusIcon(run.status)}
                                 </div>
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex items-center space-x-3 text-xs text-gray-500">
-                                    {run.tokens_used && (
-                                      <span className="flex items-center space-x-1">
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        <span>{run.tokens_used} tokens</span>
-                                      </span>
-                                    )}
-                                    <span>{new Date(run.started_at).toLocaleString()}</span>
-                                  </div>
-                                  <svg 
-                                    className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    Run #{run.id.slice(-6)}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {new Date(run.started_at).toLocaleString()}
+                                  </p>
                                 </div>
                               </div>
-                              
-                              {/* Run Preview - Always Visible */}
-                              <div className="mt-2">
-                                <div className="text-sm text-gray-300 font-medium mb-1">
-                                  Run #{agentRuns.length - index}
+                              <svg
+                                className={`w-4 h-4 text-gray-400 transition-transform ${
+                                  expandedRuns.has(run.id) ? 'rotate-180' : ''
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+
+                          {expandedRuns.has(run.id) && (
+                            <div className="border-t border-gray-200 dark:border-[#444] p-3 bg-white dark:bg-[#1f1f1f]">
+                              <div className="space-y-3">
+                                <div>
+                                  <h5 className="text-xs font-medium text-gray-900 dark:text-white mb-1">Result</h5>
+                                  <div 
+                                    className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-2 rounded border prose prose-xs max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(run.result || '') }}
+                                  />
                                 </div>
-                                <div className="text-xs text-gray-400">
-                                  {getRunPreview(run)}
+                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200 dark:border-[#444]">
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Started</p>
+                                    <p className="text-xs text-gray-900 dark:text-white">
+                                      {new Date(run.started_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                  {run.completed_at && (
+                                    <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
+                                      <p className="text-xs text-gray-900 dark:text-white">
+                                        {new Date(run.completed_at).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
-
-                            {/* Run Content - Only Visible When Expanded */}
-                            {isExpanded && (
-                              <div className="p-4">
-                                {run.result ? (
-                                  (() => {
-                                    const news = parseAgentRunResult(run.result)
-                                    if (news && news.articles.length > 0) {
-                                      return (
-                                        <div className="space-y-4">
-                                          {news.aiSummary && (
-                                            <div className="mb-2 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-blue-200 text-sm font-medium">
-                                              <span className="font-bold text-blue-300">AI Summary:</span> {news.aiSummary}
-                                            </div>
-                                          )}
-                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {news.articles.map((article: any, idx: number) => (
-                                              <div key={idx} className="bg-[#18181b] rounded-xl border border-gray-700/50 shadow-lg overflow-hidden flex flex-col">
-                                                {article.image && (
-                                                  <img src={article.image} alt={article.title} className="w-full h-40 object-cover" />
-                                                )}
-                                                <div className="p-4 flex-1 flex flex-col">
-                                                  <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">{article.title}</h3>
-                                                  {article.source && (
-                                                    <div className="text-xs text-gray-400 mb-2">Source: {article.source}</div>
-                                                  )}
-                                                  <p className="text-gray-300 text-sm mb-3 line-clamp-4">{article.summary}</p>
-                                                  <a href={article.url} target="_blank" rel="noopener noreferrer" className="mt-auto inline-block px-3 py-1 bg-[#6366f1] hover:bg-[#8b5cf6] text-white rounded-lg text-xs font-semibold transition-colors">Read More</a>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )
-                                    }
-                                    // Fallback: render as markdown
-                                    return (
-                                      <div className="prose prose-invert prose-sm max-w-none">
-                                        <div 
-                                          className="text-gray-200 leading-relaxed whitespace-pre-wrap"
-                                          dangerouslySetInnerHTML={{
-                                            __html: renderMarkdown(run.result)
-                                          }}
-                                        />
-                                      </div>
-                                    )
-                                  })()
-                                ) : run.error_message ? (
-                                  <div className="space-y-3">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                      </svg>
-                                      <span className="text-red-300 text-sm font-medium">Execution Failed</span>
-                                    </div>
-                                    <div className="bg-red-900/20 rounded-lg p-3 border border-red-700/30">
-                                      <p className="text-red-200 text-sm">{run.error_message}</p>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-center py-4">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
-                                    <span className="ml-2 text-gray-400 text-sm">Processing...</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-
-                  {/* Quick Stats */}
-                  {agentRuns.length > 0 && (
-                    <div className="mt-6 pt-4 border-t border-gray-700/30">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-emerald-400">
-                            {agentRuns.filter(r => r.status === 'completed').length}
-                          </div>
-                          <div className="text-xs text-gray-500">Successful</div>
+                          )}
                         </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-red-400">
-                            {agentRuns.filter(r => r.status === 'failed').length}
-                          </div>
-                          <div className="text-xs text-gray-500">Failed</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-400">
-                            {agentRuns.filter(r => r.status === 'running').length}
-                          </div>
-                          <div className="text-xs text-gray-500">Running</div>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Agent Form Modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agent</h3>
+            <form onSubmit={handleCreateAgent} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Task Prompt</label>
+                <textarea
+                  value={formData.task_prompt}
+                  onChange={(e) => setFormData({ ...formData, task_prompt: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule</label>
+                  <select
+                    value={formData.schedule}
+                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+                  >
+                    <option value="data-analysis">Data Analysis</option>
+                    <option value="content-generation">Content Generation</option>
+                    <option value="automation">Automation</option>
+                    <option value="monitoring">Monitoring</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 dark:bg-[#6366f1] text-white rounded-lg hover:bg-blue-700 dark:hover:bg-[#5b5beb] transition-colors"
+                >
+                  Create Agent
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Templates Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Agent Templates</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="bg-gray-50 dark:bg-[#2a2a2a] rounded-lg p-4 border border-gray-200 dark:border-[#444] cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                  onClick={() => handleTemplateSelect(template)}
+                >
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">{template.name}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{template.description}</p>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{template.category}</span>
+                    <span>•</span>
+                    <span>{template.complexity}</span>
+                    <span>•</span>
+                    <span>{template.schedule}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-[#333] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

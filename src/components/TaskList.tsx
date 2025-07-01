@@ -19,9 +19,13 @@ interface Task {
 
 export default function TaskList({ userId }: { userId: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'date' | 'status' | 'complexity'>('date')
   const supabase = createClientComponentClient()
 
   const fetchTasks = async () => {
@@ -33,6 +37,7 @@ export default function TaskList({ userId }: { userId: string }) {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ) : []
         setTasks(sortedTasks)
+        setFilteredTasks(sortedTasks)
         
         // Auto-expand the latest task if there are tasks
         if (sortedTasks.length > 0) {
@@ -46,6 +51,43 @@ export default function TaskList({ userId }: { userId: string }) {
       setRefreshing(false)
     }
   }
+
+  // Filter and sort tasks based on search query, status filter, and sort preference
+  useEffect(() => {
+    let filtered = tasks
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(task =>
+        task.task_prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (task.result && task.result.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (task.category && task.category.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(task => task.status === statusFilter)
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case 'status':
+          const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2, 'failed': 3 }
+          return (statusOrder[a.status as keyof typeof statusOrder] || 4) - (statusOrder[b.status as keyof typeof statusOrder] || 4)
+        case 'complexity':
+          const complexityOrder = { 'low': 0, 'medium': 1, 'high': 2 }
+          return (complexityOrder[a.complexity as keyof typeof complexityOrder] || 3) - (complexityOrder[b.complexity as keyof typeof complexityOrder] || 3)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredTasks(filtered)
+  }, [tasks, searchQuery, statusFilter, sortBy])
 
   useEffect(() => {
     fetchTasks()
@@ -83,6 +125,12 @@ export default function TaskList({ userId }: { userId: string }) {
       }
       return newSet
     })
+  }
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setSortBy('date')
   }
 
   const getStatusColor = (status: string) => {
@@ -199,281 +247,236 @@ export default function TaskList({ userId }: { userId: string }) {
     if (result) {
       // Return first 100 characters of result
       return result.length > 100 ? result.substring(0, 100) + '...' : result
-    } else if (prompt) {
-      // Return first 100 characters of prompt
-      return prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt
     }
     
-    return 'No content available'
+    // Return first 100 characters of prompt if no result
+    return prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt
   }
 
   if (loading) {
     return (
-      <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
-        <div className="flex items-center space-x-3 mb-5">
-          <div className="w-8 h-8 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            ))}
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">Your AI Tasks</h2>
-            <p className="text-gray-400 text-xs">Loading your tasks...</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center py-6">
-          <svg className="animate-spin h-6 w-6 text-[#6366f1]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-      </div>
-    )
-  }
-
-  if (tasks.length === 0) {
-    return (
-      <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
-        <div className="flex items-center space-x-3 mb-5">
-          <div className="w-8 h-8 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">Your AI Tasks</h2>
-            <p className="text-gray-400 text-xs">No tasks submitted yet</p>
-          </div>
-        </div>
-        <div className="text-center py-6">
-          <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-300">No tasks yet</h3>
-          <p className="mt-1 text-xs text-gray-500">Get started by creating your first AI task.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+      {/* Search and Filter Header */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tasks</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => fetchTasks()}
+              disabled={refreshing}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              title="Refresh tasks"
+            >
+              <svg className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            {(searchQuery || statusFilter !== 'all') && (
+              <button
+                onClick={clearFilters}
+                className="px-3 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search tasks by prompt, result, or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3">
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white text-sm"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+          </select>
+
+          {/* Sort By */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'status' | 'complexity')}
+            className="px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white text-sm"
+          >
+            <option value="date">Sort by Date</option>
+            <option value="status">Sort by Status</option>
+            <option value="complexity">Sort by Complexity</option>
+          </select>
+
+          {/* Results Count */}
+          <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            {filteredTasks.length} of {tasks.length} tasks
+          </div>
+        </div>
+      </div>
+
+      {/* Task List */}
+      {filteredTasks.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-[#2a2a2a] rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">Your AI Tasks</h2>
-            <p className="text-gray-400 text-xs">{tasks.length} task{tasks.length !== 1 ? 's' : ''} total</p>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchQuery || statusFilter !== 'all' ? 'No tasks found' : 'No tasks yet'}
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            {searchQuery || statusFilter !== 'all' 
+              ? 'Try adjusting your search or filters' 
+              : 'Create your first task to get started'
+            }
+          </p>
         </div>
-        {refreshing && (
-          <div className="flex items-center space-x-2 text-xs text-gray-400">
-            <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>Updating...</span>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        {tasks.map((task, idx) => {
-          const isExpanded = expandedTasks.has(task.id)
-          const isLatest = idx === 0
-          
-          return (
-            <div key={task.id} className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-gray-600/50 transition-all duration-200">
-              {/* Task Header - Always Visible */}
-              <div 
-                className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/30 cursor-pointer hover:bg-gray-800/50 transition-colors"
+      ) : (
+        <div className="space-y-4">
+          {filteredTasks.map((task) => (
+            <div
+              key={task.id}
+              className="bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden"
+            >
+              {/* Task Header */}
+              <div
+                className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
                 onClick={() => toggleTaskExpansion(task.id)}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      task.status === 'completed' ? 'bg-emerald-400' :
-                      task.status === 'in_progress' ? 'bg-blue-400 animate-pulse' :
-                      task.status === 'pending' ? 'bg-amber-400' :
-                      task.status === 'failed' ? 'bg-red-400' :
-                      'bg-gray-400'
-                    }`}></div>
-                    <span className={`text-sm font-medium ${
-                      task.status === 'completed' ? 'text-emerald-300' :
-                      task.status === 'in_progress' ? 'text-blue-300' :
-                      task.status === 'pending' ? 'text-amber-300' :
-                      task.status === 'failed' ? 'text-red-300' :
-                      'text-gray-300'
-                    }`}>
-                      {task.status.charAt(0).toUpperCase() + task.status.slice(1).replace('_', ' ')}
-                    </span>
-                    {isLatest && (
-                      <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 rounded-md">
-                        Latest
-                      </span>
-                    )}
-                    {task.category && (
-                      <span className="px-2 py-1 text-xs bg-gray-700/50 text-gray-400 rounded-md">
-                        {task.category}
-                      </span>
-                    )}
-                    {task.complexity && (
-                      <span className={`px-2 py-1 text-xs bg-gray-700/50 rounded-md ${getComplexityColor(task.complexity)}`}>
-                        {task.complexity}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-3 text-xs text-gray-500">
-                      {task.model_used && (
-                        <span className="flex items-center space-x-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                          </svg>
-                          <span>{task.model_used}</span>
-                        </span>
-                      )}
-                      {task.tokens_used && (
-                        <span className="flex items-center space-x-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <span>{task.tokens_used.toLocaleString()}</span>
-                        </span>
-                      )}
-                      <span>{new Date(task.created_at).toLocaleString()}</span>
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${getStatusColor(task.status)}`}>
+                      {getStatusIcon(task.status)}
                     </div>
-                    <svg 
-                      className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {task.task_prompt}
+                      </p>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
+                          {task.status.replace('_', ' ')}
+                        </span>
+                        {task.complexity && (
+                          <span className={`text-xs ${getComplexityColor(task.complexity)}`}>
+                            {task.complexity} complexity
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(task.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Task Preview - Always Visible */}
-                <div className="mt-2">
-                  <div className="text-sm text-gray-300 font-medium mb-1">
-                    Task #{tasks.length - idx}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {getTaskPreview(task)}
-                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                      expandedTasks.has(task.id) ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
               </div>
 
-              {/* Task Content - Only Visible When Expanded */}
-              {isExpanded && (
-                <div className="p-4">
-                  {/* Task Prompt */}
-                  <div className="mb-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span className="text-blue-300 text-sm font-medium">Task #{tasks.length - idx}</span>
+              {/* Task Details (Expanded) */}
+              {expandedTasks.has(task.id) && (
+                <div className="border-t border-gray-200 dark:border-[#444] p-4 bg-white dark:bg-[#1f1f1f]">
+                  <div className="space-y-4">
+                    {/* Task Prompt */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Task Prompt</h4>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-3 rounded border">
+                        {task.task_prompt}
+                      </p>
                     </div>
-                    <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/30">
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        {renderMarkdown(task.task_prompt)}
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Task Result or Error */}
-                  {task.result ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-emerald-300 text-sm font-medium">AI Response</span>
+                    {/* Task Result */}
+                    {task.result && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Result</h4>
+                        <div 
+                          className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-3 rounded border prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(task.result) }}
+                        />
                       </div>
-                      <div className="bg-emerald-900/20 rounded-lg p-3 border border-emerald-700/30">
-                        <div className="prose prose-invert prose-sm max-w-none">
-                          <div 
-                            className="text-emerald-200 leading-relaxed"
-                            dangerouslySetInnerHTML={{
-                              __html: renderMarkdown(task.result)
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : task.error_message ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-red-300 text-sm font-medium">Execution Failed</span>
-                      </div>
-                      <div className="bg-red-900/20 rounded-lg p-3 border border-red-700/30">
-                        <p className="text-red-200 text-sm">{task.error_message}</p>
-                      </div>
-                    </div>
-                  ) : task.status === 'in_progress' ? (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
-                      <span className="ml-2 text-gray-400 text-sm">Processing...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="animate-pulse rounded-full h-6 w-6 bg-amber-400/20"></div>
-                      <span className="ml-2 text-gray-400 text-sm">Waiting to start...</span>
-                    </div>
-                  )}
-
-                  {/* Task Metadata */}
-                  <div className="mt-4 pt-3 border-t border-gray-700/30 flex items-center justify-between text-xs text-gray-500">
-                    <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
-                    {task.updated_at && task.updated_at !== task.created_at && (
-                      <span>Updated {new Date(task.updated_at).toLocaleDateString()}</span>
                     )}
+
+                    {/* Error Message */}
+                    {task.error_message && (
+                      <div>
+                        <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">Error</h4>
+                        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-3 rounded border">
+                          {task.error_message}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Task Metadata */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200 dark:border-[#444]">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Created</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {new Date(task.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {task.updated_at && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Updated</p>
+                          <p className="text-sm text-gray-900 dark:text-white">
+                            {new Date(task.updated_at).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                      {task.model_used && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Model</p>
+                          <p className="text-sm text-gray-900 dark:text-white">{task.model_used}</p>
+                        </div>
+                      )}
+                      {task.tokens_used && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Tokens</p>
+                          <p className="text-sm text-gray-900 dark:text-white">{task.tokens_used.toLocaleString()}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-          )
-        })}
-      </div>
-
-      {/* Quick Stats */}
-      {tasks.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-gray-700/30">
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">
-                {tasks.filter(t => t.status === 'completed').length}
-              </div>
-              <div className="text-xs text-gray-500">Completed</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">
-                {tasks.filter(t => t.status === 'in_progress').length}
-              </div>
-              <div className="text-xs text-gray-500">In Progress</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-amber-400">
-                {tasks.filter(t => t.status === 'pending').length}
-              </div>
-              <div className="text-xs text-gray-500">Pending</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-400">
-                {tasks.filter(t => t.status === 'failed').length}
-              </div>
-              <div className="text-xs text-gray-500">Failed</div>
-            </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
