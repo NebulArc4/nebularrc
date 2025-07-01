@@ -24,6 +24,7 @@ export default function AgentManager() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set())
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set())
 
   // Form state
   const [formData, setFormData] = useState({
@@ -167,11 +168,31 @@ export default function AgentManager() {
       const response = await fetch(`/api/agents/run?agentId=${agentId}&limit=10`)
       if (response.ok) {
         const data = await response.json()
-        setAgentRuns(Array.isArray(data) ? data : [])
+        const sortedRuns = Array.isArray(data) ? data.sort((a: AgentRun, b: AgentRun) => 
+          new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+        ) : []
+        setAgentRuns(sortedRuns)
+        
+        // Auto-expand the latest run if there are runs
+        if (sortedRuns.length > 0) {
+          setExpandedRuns(new Set([sortedRuns[0].id]))
+        }
       }
     } catch (error) {
       console.error('Error fetching agent runs:', error)
     }
+  }
+
+  const toggleRunExpansion = (runId: string) => {
+    setExpandedRuns(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(runId)) {
+        newSet.delete(runId)
+      } else {
+        newSet.add(runId)
+      }
+      return newSet
+    })
   }
 
   // Real-time subscription for agent runs
@@ -199,11 +220,10 @@ export default function AgentManager() {
 
   const handleTemplateSelect = (template: AgentTemplate) => {
     setFormData({
+      ...formData,
       name: template.name,
       description: template.description,
       task_prompt: template.task_prompt,
-      schedule: template.schedule,
-      custom_schedule: '',
       category: template.category,
       model: template.model,
       complexity: template.complexity
@@ -214,20 +234,31 @@ export default function AgentManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-500/10 text-green-400 border-green-500/20'
-      case 'running': return 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20'
-      case 'failed': return 'bg-red-500/10 text-red-400 border-red-500/20'
-      default: return 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+      case 'completed':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+      case 'running':
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/20'
+      default:
+        return 'bg-gray-500/10 text-gray-400 border-gray-500/20'
     }
   }
 
   const getScheduleIcon = (schedule: string) => {
     switch (schedule) {
-      case 'hourly': return '🕐'
-      case 'daily': return '📅'
-      case 'weekly': return '📆'
-      case 'monthly': return '🗓️'
-      default: return '⚙️'
+      case 'hourly':
+        return '🕐'
+      case 'daily':
+        return '📅'
+      case 'weekly':
+        return '📆'
+      case 'monthly':
+        return '🗓️'
+      case 'custom':
+        return '⚙️'
+      default:
+        return '📋'
     }
   }
 
@@ -275,66 +306,88 @@ export default function AgentManager() {
       .replace(/\n/g, '<br>')
   }
 
-  // Helper: Parse news markdown into structured articles
   function parseNewsMarkdown(markdown: string) {
-    // Detect if it's a news report (sports or startup/tech)
-    const isSports = markdown.startsWith('# 🏈 Sports News Report');
-    const isStartup = markdown.startsWith('# 🚀 Startup & Tech News Report');
-    if (!isSports && !isStartup) return null;
-
-    // Sports news: headlines are like ### 1. [Title](url)\n*Source: Source*\nDescription
-    if (isSports) {
-      const articleRegex = /### (\d+)\. \[(.*?)\]\((.*?)\)\n\*Source: (.*?)\*\n([\s\S]*?)(?=\n###|---|$)/g;
-      const articles = [];
-      let match;
-      while ((match = articleRegex.exec(markdown))) {
-        articles.push({
-          title: match[2],
-          url: match[3],
-          source: match[4],
-          description: match[5]?.trim(),
-          image: null // NewsAPI images not included in markdown, could be added later
-        });
-      }
-      return { type: 'sports', articles };
-    }
-
-    // Startup/tech news: headlines are like ### 1. Title\n**Category:** ... | **Impact:** ...\nSummary\n🔗 [Read Full Story](url)
-    if (isStartup) {
-      const articleRegex = /### (\d+)\. (.*?)\n\*\*Category:\*\* (.*?) \| \*\*Impact:\*\* (.*?)\n([\s\S]*?)\n🔗 \[Read Full Story\]\((.*?)\)\n---/g;
-      const articles = [];
-      let match;
-      while ((match = articleRegex.exec(markdown))) {
-        articles.push({
-          title: match[2],
-          category: match[3],
-          impact: match[4],
-          summary: match[5]?.trim(),
-          url: match[6],
-          image: null // No image in mock data
-        });
-      }
-      return { type: 'startup', articles };
-    }
-    return null;
-  }
-
-  // Helper: Parse agent run result for news-cards
-  function parseAgentRunResult(result: string) {
     try {
-      const parsed = JSON.parse(result)
-      if (parsed && parsed.type === 'news-cards' && Array.isArray(parsed.articles)) {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(markdown)
+      if (parsed.articles && Array.isArray(parsed.articles)) {
         return parsed
       }
-    } catch (e) {}
+    } catch (e) {
+      // Not JSON, continue with markdown parsing
+    }
+
+    // Simple markdown parsing for news format
+    const lines = markdown.split('\n')
+    const result = {
+      aiSummary: '',
+      articles: [] as any[]
+    }
+
+    let currentArticle: any = {}
+    let inArticle = false
+
+    for (const line of lines) {
+      if (line.startsWith('## AI Summary:')) {
+        result.aiSummary = line.replace('## AI Summary:', '').trim()
+      } else if (line.startsWith('### ')) {
+        if (inArticle && currentArticle.title) {
+          result.articles.push(currentArticle)
+        }
+        currentArticle = { title: line.replace('### ', '').trim() }
+        inArticle = true
+      } else if (line.startsWith('**Source:**') && inArticle) {
+        currentArticle.source = line.replace('**Source:**', '').trim()
+      } else if (line.startsWith('**URL:**') && inArticle) {
+        currentArticle.url = line.replace('**URL:**', '').trim()
+      } else if (line.startsWith('**Image:**') && inArticle) {
+        currentArticle.image = line.replace('**Image:**', '').trim()
+      } else if (line.trim() && inArticle && !currentArticle.summary) {
+        currentArticle.summary = line.trim()
+      }
+    }
+
+    if (inArticle && currentArticle.title) {
+      result.articles.push(currentArticle)
+    }
+
+    return result.articles.length > 0 ? result : null
+  }
+
+  function parseAgentRunResult(result: string) {
+    try {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(result)
+      if (parsed.articles && Array.isArray(parsed.articles)) {
+        return parsed
+      }
+    } catch (e) {
+      // Not JSON, try markdown parsing
+      return parseNewsMarkdown(result)
+    }
     return null
+  }
+
+  const getRunPreview = (run: AgentRun): string => {
+    if (run.result) {
+      const news = parseAgentRunResult(run.result)
+      if (news && news.articles.length > 0) {
+        return `Generated ${news.articles.length} news articles${news.aiSummary ? ' with AI summary' : ''}`
+      }
+      // Return first 100 characters of result
+      return run.result.length > 100 ? run.result.substring(0, 100) + '...' : run.result
+    } else if (run.error_message) {
+      return `Error: ${run.error_message}`
+    }
+    
+    return 'No content available'
   }
 
   if (loading) {
     return (
-      <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-6">
-        <div className="flex items-center justify-center py-8">
-          <svg className="animate-spin h-8 w-8 text-[#6366f1]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
+        <div className="flex items-center justify-center py-6">
+          <svg className="animate-spin h-6 w-6 text-[#6366f1]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
@@ -344,7 +397,8 @@ export default function AgentManager() {
   }
 
   return (
-    <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-6">
+    <div className="bg-[#1f1f1f] rounded-lg border border-[#333] p-5">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-lg flex items-center justify-center">
@@ -354,47 +408,41 @@ export default function AgentManager() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-white">AI Agents</h2>
-            <p className="text-gray-400 text-xs">24/7 automated task execution</p>
+            <p className="text-gray-400 text-xs">Automated AI agents that run on schedule</p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowTemplates(!showTemplates)}
-            className="px-3 py-1.5 text-sm bg-[#6366f1]/20 hover:bg-[#6366f1]/30 text-[#6366f1] rounded-lg transition-colors"
+            className="px-3 py-1 text-xs bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded transition-colors"
           >
-            Templates
+            {showTemplates ? 'Hide' : 'Show'} Templates
           </button>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-3 py-1.5 text-sm bg-[#8b5cf6]/20 hover:bg-[#8b5cf6]/30 text-[#8b5cf6] rounded-lg transition-colors"
+            className="px-3 py-1 text-xs bg-[#6366f1] hover:bg-[#6366f1]/80 text-white rounded transition-colors"
           >
             {showCreateForm ? 'Cancel' : 'Create Agent'}
           </button>
         </div>
       </div>
 
-      {/* Agent Templates */}
+      {/* Templates */}
       {showTemplates && (
         <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-          <h4 className="text-white font-semibold mb-3">Quick Start Templates</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <h4 className="text-white font-semibold mb-3">Agent Templates</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {templates.map(template => (
               <div
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}
-                className="p-3 bg-gray-700/50 hover:bg-gray-700/70 rounded-lg cursor-pointer transition-colors border border-gray-600 hover:border-[#6366f1]/50"
+                className="p-3 bg-gray-700/50 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700/70 transition-colors"
               >
-                <h5 className="font-semibold text-white text-sm mb-1">{template.name}</h5>
+                <h5 className="text-white font-medium text-sm mb-1">{template.name}</h5>
                 <p className="text-gray-400 text-xs mb-2">{template.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500 text-xs">{getScheduleIcon(template.schedule)} {template.schedule}</span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    template.complexity === 'low' ? 'bg-green-500/20 text-green-400' :
-                    template.complexity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-red-500/20 text-red-400'
-                  }`}>
-                    {template.complexity}
-                  </span>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>{template.category}</span>
+                  <span>{template.complexity}</span>
                 </div>
               </div>
             ))}
@@ -533,6 +581,7 @@ export default function AgentManager() {
                       if (selectedAgent?.id === agent.id) {
                         setSelectedAgent(null)
                         setAgentRuns([])
+                        setExpandedRuns(new Set())
                       } else {
                         setSelectedAgent(agent)
                         fetchAgentRuns(agent.id)
@@ -559,7 +608,7 @@ export default function AgentManager() {
                     <span className="text-gray-400 text-sm">Last 10 runs</span>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {agentRuns.length === 0 ? (
                       <div className="text-center py-8 bg-gray-800/30 rounded-lg border border-gray-700/50">
                         <div className="w-12 h-12 mx-auto mb-3 bg-gray-700/50 rounded-full flex items-center justify-center">
@@ -571,112 +620,147 @@ export default function AgentManager() {
                         <p className="text-gray-500 text-sm">Click "Run Now" to start your first execution</p>
                       </div>
                     ) : (
-                      agentRuns.map((run, index) => (
-                        <div key={run.id} className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-gray-600/50 transition-all duration-200">
-                          {/* Run Header */}
-                          <div className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/30">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-2 h-2 rounded-full ${
-                                  run.status === 'completed' ? 'bg-emerald-400' :
-                                  run.status === 'running' ? 'bg-blue-400 animate-pulse' :
-                                  run.status === 'failed' ? 'bg-red-400' :
-                                  'bg-gray-400'
-                                }`}></div>
-                                <span className={`text-sm font-medium ${
-                                  run.status === 'completed' ? 'text-emerald-300' :
-                                  run.status === 'running' ? 'text-blue-300' :
-                                  run.status === 'failed' ? 'text-red-300' :
-                                  'text-gray-300'
-                                }`}>
-                                  {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                                </span>
-                                {run.model_used && (
-                                  <span className="px-2 py-1 text-xs bg-gray-700/50 text-gray-400 rounded-md">
-                                    {run.model_used}
+                      agentRuns.map((run, index) => {
+                        const isExpanded = expandedRuns.has(run.id)
+                        const isLatest = index === 0
+                        
+                        return (
+                          <div key={run.id} className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-gray-600/50 transition-all duration-200">
+                            {/* Run Header - Always Visible */}
+                            <div 
+                              className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/30 cursor-pointer hover:bg-gray-800/50 transition-colors"
+                              onClick={() => toggleRunExpansion(run.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    run.status === 'completed' ? 'bg-emerald-400' :
+                                    run.status === 'running' ? 'bg-blue-400 animate-pulse' :
+                                    run.status === 'failed' ? 'bg-red-400' :
+                                    'bg-gray-400'
+                                  }`}></div>
+                                  <span className={`text-sm font-medium ${
+                                    run.status === 'completed' ? 'text-emerald-300' :
+                                    run.status === 'running' ? 'text-blue-300' :
+                                    run.status === 'failed' ? 'text-red-300' :
+                                    'text-gray-300'
+                                  }`}>
+                                    {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
                                   </span>
-                                )}
+                                  {isLatest && (
+                                    <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 rounded-md">
+                                      Latest
+                                    </span>
+                                  )}
+                                  {run.model_used && (
+                                    <span className="px-2 py-1 text-xs bg-gray-700/50 text-gray-400 rounded-md">
+                                      {run.model_used}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center space-x-3 text-xs text-gray-500">
+                                    {run.tokens_used && (
+                                      <span className="flex items-center space-x-1">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        <span>{run.tokens_used} tokens</span>
+                                      </span>
+                                    )}
+                                    <span>{new Date(run.started_at).toLocaleString()}</span>
+                                  </div>
+                                  <svg 
+                                    className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-3 text-xs text-gray-500">
-                                {run.tokens_used && (
-                                  <span className="flex items-center space-x-1">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    <span>{run.tokens_used} tokens</span>
-                                  </span>
-                                )}
-                                <span>{new Date(run.started_at).toLocaleString()}</span>
+                              
+                              {/* Run Preview - Always Visible */}
+                              <div className="mt-2">
+                                <div className="text-sm text-gray-300 font-medium mb-1">
+                                  Run #{agentRuns.length - index}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {getRunPreview(run)}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Run Content */}
-                          <div className="p-4">
-                            {run.result ? (
-                              (() => {
-                                const news = parseAgentRunResult(run.result)
-                                if (news && news.articles.length > 0) {
-                                  return (
-                                    <div className="space-y-4">
-                                      {news.aiSummary && (
-                                        <div className="mb-2 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-blue-200 text-sm font-medium">
-                                          <span className="font-bold text-blue-300">AI Summary:</span> {news.aiSummary}
-                                        </div>
-                                      )}
-                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {news.articles.map((article: any, idx: number) => (
-                                          <div key={idx} className="bg-[#18181b] rounded-xl border border-gray-700/50 shadow-lg overflow-hidden flex flex-col">
-                                            {article.image && (
-                                              <img src={article.image} alt={article.title} className="w-full h-40 object-cover" />
-                                            )}
-                                            <div className="p-4 flex-1 flex flex-col">
-                                              <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">{article.title}</h3>
-                                              {article.source && (
-                                                <div className="text-xs text-gray-400 mb-2">Source: {article.source}</div>
-                                              )}
-                                              <p className="text-gray-300 text-sm mb-3 line-clamp-4">{article.summary}</p>
-                                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="mt-auto inline-block px-3 py-1 bg-[#6366f1] hover:bg-[#8b5cf6] text-white rounded-lg text-xs font-semibold transition-colors">Read More</a>
+                            {/* Run Content - Only Visible When Expanded */}
+                            {isExpanded && (
+                              <div className="p-4">
+                                {run.result ? (
+                                  (() => {
+                                    const news = parseAgentRunResult(run.result)
+                                    if (news && news.articles.length > 0) {
+                                      return (
+                                        <div className="space-y-4">
+                                          {news.aiSummary && (
+                                            <div className="mb-2 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-blue-200 text-sm font-medium">
+                                              <span className="font-bold text-blue-300">AI Summary:</span> {news.aiSummary}
                                             </div>
+                                          )}
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {news.articles.map((article: any, idx: number) => (
+                                              <div key={idx} className="bg-[#18181b] rounded-xl border border-gray-700/50 shadow-lg overflow-hidden flex flex-col">
+                                                {article.image && (
+                                                  <img src={article.image} alt={article.title} className="w-full h-40 object-cover" />
+                                                )}
+                                                <div className="p-4 flex-1 flex flex-col">
+                                                  <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">{article.title}</h3>
+                                                  {article.source && (
+                                                    <div className="text-xs text-gray-400 mb-2">Source: {article.source}</div>
+                                                  )}
+                                                  <p className="text-gray-300 text-sm mb-3 line-clamp-4">{article.summary}</p>
+                                                  <a href={article.url} target="_blank" rel="noopener noreferrer" className="mt-auto inline-block px-3 py-1 bg-[#6366f1] hover:bg-[#8b5cf6] text-white rounded-lg text-xs font-semibold transition-colors">Read More</a>
+                                                </div>
+                                              </div>
+                                            ))}
                                           </div>
-                                        ))}
+                                        </div>
+                                      )
+                                    }
+                                    // Fallback: render as markdown
+                                    return (
+                                      <div className="prose prose-invert prose-sm max-w-none">
+                                        <div 
+                                          className="text-gray-200 leading-relaxed whitespace-pre-wrap"
+                                          dangerouslySetInnerHTML={{
+                                            __html: renderMarkdown(run.result)
+                                          }}
+                                        />
                                       </div>
+                                    )
+                                  })()
+                                ) : run.error_message ? (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      <span className="text-red-300 text-sm font-medium">Execution Failed</span>
                                     </div>
-                                  )
-                                }
-                                // Fallback: render as markdown
-                                return (
-                                  <div className="prose prose-invert prose-sm max-w-none">
-                                    <div 
-                                      className="text-gray-200 leading-relaxed whitespace-pre-wrap"
-                                      dangerouslySetInnerHTML={{
-                                        __html: renderMarkdown(run.result)
-                                      }}
-                                    />
+                                    <div className="bg-red-900/20 rounded-lg p-3 border border-red-700/30">
+                                      <p className="text-red-200 text-sm">{run.error_message}</p>
+                                    </div>
                                   </div>
-                                )
-                              })()
-                            ) : run.error_message ? (
-                              <div className="space-y-3">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span className="text-red-300 text-sm font-medium">Execution Failed</span>
-                                </div>
-                                <div className="bg-red-900/20 rounded-lg p-3 border border-red-700/30">
-                                  <p className="text-red-200 text-sm">{run.error_message}</p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center py-4">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
-                                <span className="ml-2 text-gray-400 text-sm">Processing...</span>
+                                ) : (
+                                  <div className="flex items-center justify-center py-4">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                                    <span className="ml-2 text-gray-400 text-sm">Processing...</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
 
