@@ -6,6 +6,12 @@ import { taskTemplates, getTemplatesByCategory, getCategories, TaskTemplate } fr
 import { modelManager, AIModel } from '@/lib/model-manager'
 import toast, { Toaster } from 'react-hot-toast'
 import jsPDF from 'jspdf'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Fix for Next.js: set workerSrc to CDN
+if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+}
 
 interface TaskSubmissionFormProps {
   user: User
@@ -24,6 +30,8 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [linkInput, setLinkInput] = useState('')
   const [result, setResult] = useState<string | null>(null)
+  const [pdfExtractedText, setPdfExtractedText] = useState<string>('')
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
 
   const taskTypes = [
     { id: 'general', name: 'General', description: 'General AI assistance' },
@@ -56,15 +64,31 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
     setPdfFile(file)
     if (file) {
       const text = await extractTextFromPDF(file)
+      setPdfExtractedText(text)
       setTaskPrompt(text)
+      setShowPdfPreview(true)
+    } else {
+      setPdfExtractedText('')
+      setShowPdfPreview(false)
     }
   }
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer()
-    // Use pdf-parse on the server for more robust extraction, but for demo, use pdfjs-dist or similar client-side
-    // For now, just return a placeholder
-    return '[PDF text extraction not implemented in browser]'
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let text = ''
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      text += content.items.map((item: any) => item.str).join(' ') + '\n'
+    }
+    return text.trim()
+  }
+
+  const handleRemovePdf = () => {
+    setPdfFile(null)
+    setPdfExtractedText('')
+    setShowPdfPreview(false)
   }
 
   const handleLinkInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,12 +375,33 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Upload PDF
         </label>
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={handleFileChange}
-          className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-        />
+        {showPdfPreview ? (
+          <div className="flex items-center space-x-4">
+            <textarea
+              value={pdfExtractedText}
+              onChange={(e) => setPdfExtractedText(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+              placeholder="Extracted text..."
+              required
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={handleRemovePdf}
+              className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={handleFileChange}
+            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+          />
+        )}
       </div>
 
       {/* Input for link */}
