@@ -191,6 +191,40 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   return (
     <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
       <Toaster position="top-right" />
+      {/* PDF Upload Section - always visible at the top */}
+      <div className="mb-6">
+        <label className="block text-sm font-bold text-white mb-2 flex items-center">
+          <svg className="w-5 h-5 mr-2 text-[#6366f1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Upload PDF (optional)
+        </label>
+        {showPdfPreview ? (
+          <div className="flex items-start space-x-4">
+            <textarea
+              value={pdfExtractedText}
+              onChange={(e) => setPdfExtractedText(e.target.value)}
+              rows={6}
+              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+              placeholder="Extracted text..."
+              required={false}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={handleRemovePdf}
+              className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700 mt-2"
+            >
+              Remove PDF
+            </button>
+          </div>
+        ) : (
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={handleFileChange}
+            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+          />
+        )}
+      </div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white">Submit AI Task</h2>
         <div className="flex space-x-2">
@@ -395,40 +429,6 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           ) : 'Submit Task'}
         </button>
       </form>
-
-      {/* File input for PDF */}
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Upload PDF
-        </label>
-        {showPdfPreview ? (
-          <div className="flex items-center space-x-4">
-            <textarea
-              value={pdfExtractedText}
-              onChange={(e) => setPdfExtractedText(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-              placeholder="Extracted text..."
-              required
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={handleRemovePdf}
-              className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700"
-            >
-              Remove
-            </button>
-          </div>
-        ) : (
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={handleFileChange}
-            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
-          />
-        )}
-      </div>
 
       {/* Input for link */}
       <div className="mt-4">
