@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Agent, AgentRun } from '@/lib/agent-service'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import AgentCard from './AgentCard'
+import Toast from './Toast'
+import Modal from './Modal'
 
 interface AgentTemplate {
   id: string
@@ -30,6 +33,8 @@ export default function AgentManager() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'last_run' | 'complexity'>('name')
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' } | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -108,8 +113,10 @@ export default function AgentManager() {
         const agentsData = Array.isArray(data) ? data : []
         setAgents(agentsData)
         setFilteredAgents(agentsData)
+        setToast({ message: 'Agents fetched successfully', type: 'success' })
       }
     } catch (error) {
+      setToast({ message: 'Error fetching agents', type: 'error' })
       console.error('Error fetching agents:', error)
     } finally {
       setLoading(false)
@@ -158,8 +165,10 @@ export default function AgentManager() {
           complexity: 'medium'
         })
         fetchAgents()
+        setToast({ message: 'Agent created successfully', type: 'success' })
       }
     } catch (error) {
+      setToast({ message: 'Error creating agent', type: 'error' })
       console.error('Error creating agent:', error)
     }
   }
@@ -195,8 +204,10 @@ export default function AgentManager() {
         if (selectedAgent?.id === agentId) {
           fetchAgentRuns(agentId)
         }
+        setToast({ message: 'Agent run started', type: 'success' })
       }
     } catch (error) {
+      setToast({ message: 'Error running agent', type: 'error' })
       console.error('Error running agent:', error)
     } finally {
       setRunningAgents(prev => {
@@ -390,25 +401,25 @@ export default function AgentManager() {
     
     return text
       // Headers
-      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-white mb-2">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-white mb-3">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-white mb-4">$1</h1>')
+      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">$1</h1>')
       
       // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900 dark:text-white">$1</strong>')
       
       // Italic
-      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-700 dark:text-gray-300">$1</em>')
       
       // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">$1</a>')
       
       // Lists - wrap in ul/ol tags
       .replace(/^(\*|-|\d+\.) (.*$)/gim, (match, bullet, content) => {
         if (bullet.match(/\d+/)) {
-          return `<li class="ml-4 text-gray-300 list-decimal">${content}</li>`
+          return `<li class="ml-4 text-gray-700 dark:text-gray-300 list-decimal">${content}</li>`
         } else {
-          return `<li class="ml-4 text-gray-300 list-disc">${content}</li>`
+          return `<li class="ml-4 text-gray-700 dark:text-gray-300 list-disc">${content}</li>`
         }
       })
       
@@ -416,14 +427,14 @@ export default function AgentManager() {
       .replace(/\|(.+)\|/g, (match) => {
         const cells = match.split('|').filter(cell => cell.trim())
         if (cells.length > 1) {
-          const cellHtml = cells.map(cell => `<td class="px-3 py-2 border border-gray-600 text-gray-300">${cell.trim()}</td>`).join('')
+          const cellHtml = cells.map(cell => `<td class="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">${cell.trim()}</td>`).join('')
           return `<tr>${cellHtml}</tr>`
         }
         return match
       })
       
       // Horizontal rules
-      .replace(/^---$/gim, '<hr class="border-gray-600 my-4">')
+      .replace(/^---$/gim, '<hr class="border-gray-300 dark:border-gray-600 my-4">')
       
       // Line breaks
       .replace(/\n/g, '<br>')
@@ -444,22 +455,11 @@ export default function AgentManager() {
   }
 
   if (loading) {
-    return (
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+    return <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-24 bg-gray-200/40 dark:bg-gray-700/40 rounded-xl animate-pulse" />)}</div>
   }
 
   return (
-    <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+    <div className="bg-gray-50 dark:bg-[#18181b] rounded-xl border border-gray-200 dark:border-[#333] p-6">
       {/* Search and Filter Header */}
       <div className="mb-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -489,7 +489,7 @@ export default function AgentManager() {
               Templates
             </button>
             <button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => setShowCreateModal(true)}
               className="px-3 py-2 bg-blue-600 dark:bg-[#6366f1] text-white rounded-lg hover:bg-blue-700 dark:hover:bg-[#5b5beb] transition-colors text-sm"
             >
               Create Agent
@@ -507,7 +507,10 @@ export default function AgentManager() {
             placeholder="Search agents by name, description, or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-[#23233a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:bg-gray-100 dark:focus:bg-[#23233a]"
           />
         </div>
 
@@ -577,255 +580,97 @@ export default function AgentManager() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredAgents.map((agent) => (
-            <div
+          {filteredAgents.map(agent => (
+            <AgentCard
               key={agent.id}
-              className="bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden"
-            >
-              {/* Agent Header */}
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                      agent.is_active 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                        : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                    }`}>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {agent.name}
-                        </h3>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                          agent.is_active 
-                            ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                            : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                        }`}>
-                          {agent.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {agent.description}
-                      </p>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {agent.category}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {agent.complexity} complexity
-                        </span>
-                        {agent.last_run && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Last run: {new Date(agent.last_run).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleRunAgent(agent.id)}
-                      disabled={runningAgents.has(agent.id)}
-                      className="px-3 py-1 text-xs bg-blue-600 dark:bg-[#6366f1] text-white rounded hover:bg-blue-700 dark:hover:bg-[#5b5beb] disabled:opacity-50 transition-colors"
-                    >
-                      {runningAgents.has(agent.id) ? 'Running...' : 'Run'}
-                    </button>
-                    <button
-                      onClick={() => handleToggleAgent(agent.id, !agent.is_active)}
-                      className={`px-3 py-1 text-xs rounded transition-colors ${
-                        agent.is_active
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                    >
-                      {agent.is_active ? 'Disable' : 'Enable'}
-                    </button>
-                    <button
-                      onClick={() => setSelectedAgent(selectedAgent?.id === agent.id ? null : agent)}
-                      className="px-3 py-1 text-xs bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-[#444] transition-colors"
-                    >
-                      {selectedAgent?.id === agent.id ? 'Hide Runs' : 'View Runs'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAgent(agent.id)}
-                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Agent Runs (Expanded) */}
-              {selectedAgent?.id === agent.id && (
-                <div className="border-t border-gray-200 dark:border-[#444] p-4 bg-white dark:bg-[#1f1f1f]">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Recent Runs</h4>
-                  {agentRuns.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No runs yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {agentRuns.map((run) => (
-                        <div key={run.id} className="bg-gray-50 dark:bg-[#2a2a2a] rounded border border-gray-200 dark:border-[#444] overflow-hidden">
-                          <div
-                            className="p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
-                            onClick={() => toggleRunExpansion(run.id)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${getStatusColor(run.status)}`}>
-                                  {getStatusIcon(run.status)}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                    Run #{run.id.slice(-6)}
-                                  </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(run.started_at).toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-                              <svg
-                                className={`w-4 h-4 text-gray-400 transition-transform ${
-                                  expandedRuns.has(run.id) ? 'rotate-180' : ''
-                                }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
-
-                          {expandedRuns.has(run.id) && (
-                            <div className="border-t border-gray-200 dark:border-[#444] p-3 bg-white dark:bg-[#1f1f1f]">
-                              <div className="space-y-3">
-                                <div>
-                                  <h5 className="text-xs font-medium text-gray-900 dark:text-white mb-1">Result</h5>
-                                  <div 
-                                    className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-2 rounded border prose prose-xs max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(run.result || '') }}
-                                  />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200 dark:border-[#444]">
-                                  <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Started</p>
-                                    <p className="text-xs text-gray-900 dark:text-white">
-                                      {new Date(run.started_at).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  {run.completed_at && (
-                                    <div>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-                                      <p className="text-xs text-gray-900 dark:text-white">
-                                        {new Date(run.completed_at).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              agent={agent}
+              onToggleActive={handleToggleAgent}
+              onRun={handleRunAgent}
+            />
           ))}
         </div>
       )}
 
       {/* Create Agent Form Modal */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agent</h3>
-            <form onSubmit={handleCreateAgent} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Task Prompt</label>
-                <textarea
-                  value={formData.task_prompt}
-                  onChange={(e) => setFormData({ ...formData, task_prompt: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule</label>
-                  <select
-                    value={formData.schedule}
-                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
-                  >
-                    <option value="hourly">Hourly</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
-                  >
-                    <option value="data-analysis">Data Analysis</option>
-                    <option value="content-generation">Content Generation</option>
-                    <option value="automation">Automation</option>
-                    <option value="monitoring">Monitoring</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 dark:bg-[#6366f1] text-white rounded-lg hover:bg-blue-700 dark:hover:bg-[#5b5beb] transition-colors"
-                >
-                  Create Agent
-                </button>
-              </div>
-            </form>
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create New Agent">
+        <form onSubmit={handleCreateAgent} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+              required
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <input
+              type="text"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Task Prompt</label>
+            <textarea
+              value={formData.task_prompt}
+              onChange={(e) => setFormData({ ...formData, task_prompt: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule</label>
+              <select
+                value={formData.schedule}
+                onChange={(e) => setFormData({ ...formData, schedule: e.target.value as any })}
+                className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+              >
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white"
+              >
+                <option value="data-analysis">Data Analysis</option>
+                <option value="content-generation">Content Generation</option>
+                <option value="automation">Automation</option>
+                <option value="monitoring">Monitoring</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 dark:bg-[#6366f1] text-white rounded-lg hover:bg-blue-700 dark:hover:bg-[#5b5beb] transition-colors"
+            >
+              Create Agent
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Templates Modal */}
       {showTemplates && (
@@ -861,6 +706,10 @@ export default function AgentManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
     </div>
   )

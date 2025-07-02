@@ -16,13 +16,13 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'text-green-400 bg-green-400/10'
+        return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-400/10'
       case 'in_progress':
-        return 'text-yellow-400 bg-yellow-400/10'
+        return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-400/10'
       case 'pending':
-        return 'text-blue-400 bg-blue-400/10'
+        return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-400/10'
       default:
-        return 'text-gray-400 bg-gray-400/10'
+        return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-400/10'
     }
   }
 
@@ -72,21 +72,21 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
   }
 
   return (
-    <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
+    <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">Recent Activity</h2>
-        <div className="text-sm text-gray-400">{tasks.length} tasks</div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Activity</h2>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{tasks.length} tasks</div>
       </div>
       
       {tasks.length === 0 ? (
         <div className="text-center py-8">
-          <div className="w-12 h-12 mx-auto mb-4 bg-[#2a2a2a] rounded-full flex items-center justify-center">
+          <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-[#2a2a2a] rounded-full flex items-center justify-center">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <p className="text-gray-400 text-sm">No recent activity</p>
-          <p className="text-gray-500 text-xs mt-1">Start by creating your first task</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">No recent activity</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">Start by creating your first task</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -94,7 +94,7 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
             <div key={task.id} className="relative">
               {/* Timeline line */}
               {index < tasks.length - 1 && (
-                <div className="absolute left-6 top-8 w-0.5 h-8 bg-[#333]"></div>
+                <div className="absolute left-6 top-8 w-0.5 h-8 bg-gray-300 dark:bg-[#333]"></div>
               )}
               
               <div className="flex items-start space-x-3">
@@ -109,15 +109,15 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                       {task.status.replace('_', ' ')}
                     </span>
-                    <span className="text-xs text-gray-400">{formatTimeAgo(task.created_at)}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(task.created_at)}</span>
                   </div>
                   
-                  <p className="text-sm text-white mb-1">
+                  <p className="text-sm text-gray-900 dark:text-white mb-1">
                     {truncateText(task.task_prompt)}
                   </p>
                   
                   {task.result && task.status === 'completed' && (
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
                       Result: {truncateText(task.result, 30)}
                     </div>
                   )}
@@ -129,7 +129,7 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
       )}
       
       {tasks.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-[#333]">
+        <div className="mt-4 pt-4 border-t border-gray-300 dark:border-[#333]">
           <button className="w-full text-center text-sm text-[#6366f1] hover:text-[#8b5cf6] transition-colors">
             View all activity
           </button>

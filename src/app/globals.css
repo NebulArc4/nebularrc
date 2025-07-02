@@ -5,6 +5,12 @@
   .subtle-glow {
     text-shadow: 0 0 4px rgba(99, 102, 241, 0.5);
   }
+  .page-fade {
+    @apply transition-opacity duration-500 ease-in-out opacity-0;
+  }
+  .page-fade-active {
+    @apply opacity-100;
+  }
 }
 
 /* RunPod-style animations */
@@ -77,4 +83,101 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 17px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%);
+  color: #222;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e5e7eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  transition: box-shadow 0.2s, border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+button {
+  border-radius: 0.75rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px 0 rgba(99,102,241,0.08);
+  border: none;
+  cursor: pointer;
+}
+button:hover, button:focus {
+  background: linear-gradient(90deg, #6366f1 0%, #6366f1 100%);
+  box-shadow: 0 4px 16px 0 rgba(99,102,241,0.12);
+}
+
+input, textarea, select {
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  background: #f8fafc;
+  color: #222;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  box-shadow: 0 1px 4px 0 rgba(0,0,0,0.03);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #6366f1;
+  outline: none;
+  background: #fff;
+}
+
+.card, .bg-card {
+  background: linear-gradient(135deg, #fff 60%, #f3f4f6 100%);
+  border-radius: 1.25rem;
+  box-shadow: 0 2px 16px 0 rgba(99,102,241,0.06);
+  padding: 2rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    background: linear-gradient(135deg, #18181b 0%, #23233a 100%);
+    color: #f3f4f6;
+  }
+  input, textarea, select {
+    background: #23233a;
+    color: #f3f4f6;
+    border-color: #33344b;
+  }
+  .card, .bg-card {
+    background: linear-gradient(135deg, #23233a 60%, #18181b 100%);
+    color: #f3f4f6;
+    box-shadow: 0 2px 16px 0 rgba(99,102,241,0.12);
+  }
+  button {
+    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+    color: #fff;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(8px); }
 }

@@ -1,10 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import jsPDF from 'jspdf'
-
-interface Task {
+export interface Task {
   id: string
   task_prompt: string
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
@@ -18,6 +14,12 @@ interface Task {
   tokens_used?: number
 }
 
+'use client'
+
+import { useEffect, useState, useRef } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import Toast from './Toast'
+
 export default function TaskList({ userId }: { userId: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
@@ -27,9 +29,12 @@ export default function TaskList({ userId }: { userId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'complexity'>('date')
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' } | null>(null)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const supabase = createClientComponentClient()
 
-  const fetchTasks = async () => {
+    const fetchTasks = async () => {
     try {
       const response = await fetch('/api/tasks')
       if (response.ok) {
@@ -46,6 +51,7 @@ export default function TaskList({ userId }: { userId: string }) {
         }
       }
     } catch (error) {
+      setToast({ message: 'Error fetching tasks', type: 'error' })
       console.error('Error fetching tasks:', error)
     } finally {
       setLoading(false)
@@ -202,25 +208,25 @@ export default function TaskList({ userId }: { userId: string }) {
     
     return text
       // Headers
-      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-white mb-2">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-white mb-3">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-white mb-4">$1</h1>')
+      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">$1</h1>')
       
       // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900 dark:text-white">$1</strong>')
       
       // Italic
-      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-700 dark:text-gray-300">$1</em>')
       
       // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">$1</a>')
       
       // Lists - wrap in ul/ol tags
       .replace(/^(\*|-|\d+\.) (.*$)/gim, (match, bullet, content) => {
         if (bullet.match(/\d+/)) {
-          return `<li class="ml-4 text-gray-300 list-decimal">${content}</li>`
+          return `<li class="ml-4 text-gray-700 dark:text-gray-300 list-decimal">${content}</li>`
         } else {
-          return `<li class="ml-4 text-gray-300 list-disc">${content}</li>`
+          return `<li class="ml-4 text-gray-700 dark:text-gray-300 list-disc">${content}</li>`
         }
       })
       
@@ -228,14 +234,14 @@ export default function TaskList({ userId }: { userId: string }) {
       .replace(/\|(.+)\|/g, (match) => {
         const cells = match.split('|').filter(cell => cell.trim())
         if (cells.length > 1) {
-          const cellHtml = cells.map(cell => `<td class="px-3 py-2 border border-gray-600 text-gray-300">${cell.trim()}</td>`).join('')
+          const cellHtml = cells.map(cell => `<td class="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">${cell.trim()}</td>`).join('')
           return `<tr>${cellHtml}</tr>`
         }
         return match
       })
       
       // Horizontal rules
-      .replace(/^---$/gim, '<hr class="border-gray-600 my-4">')
+      .replace(/^---$/gim, '<hr class="border-gray-300 dark:border-gray-600 my-4">')
       
       // Line breaks
       .replace(/\n/g, '<br>')
@@ -254,11 +260,27 @@ export default function TaskList({ userId }: { userId: string }) {
     return prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt
   }
 
-  const handleDownloadPDF = (result?: string) => {
-    if (!result) return
-    const doc = new jsPDF()
-    doc.text(result, 10, 10)
-    doc.save('task-result.pdf')
+  const handleDownloadPDF = async (result?: string) => {
+    if (typeof window === 'undefined') return;
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    if (result) {
+      doc.text(result, 10, 10);
+    }
+    doc.save('task-result.pdf');
+  }
+
+  const deleteTask = async (taskId: string) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return
+    try {
+      const res = await fetch(`/api/tasks?taskId=${taskId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete task')
+      setTasks(tasks.filter(t => t.id !== taskId))
+      setFilteredTasks(filteredTasks.filter(t => t.id !== taskId))
+      setToast({ message: 'Task deleted', type: 'success' })
+    } catch (e: any) {
+      setToast({ message: e.message || 'Error deleting task', type: 'error' })
+    }
   }
 
   if (loading) {
@@ -277,7 +299,7 @@ export default function TaskList({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
+    <div className="bg-gray-50 dark:bg-[#18181b] rounded-xl border border-gray-200 dark:border-[#333] p-6">
       {/* Search and Filter Header */}
       <div className="mb-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -314,7 +336,10 @@ export default function TaskList({ userId }: { userId: string }) {
             placeholder="Search tasks by prompt, result, or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-[#2a2a2a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-[#23233a] border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:bg-gray-100 dark:focus:bg-[#23233a]"
           />
         </div>
 
@@ -378,7 +403,7 @@ export default function TaskList({ userId }: { userId: string }) {
             >
               {/* Task Header */}
               <div
-                className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors relative"
                 onClick={() => toggleTaskExpansion(task.id)}
               >
                 <div className="flex items-center justify-between">
@@ -388,33 +413,33 @@ export default function TaskList({ userId }: { userId: string }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {task.task_prompt}
+                        {getTaskPreview(task)}
                       </p>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
-                          {task.status.replace('_', ' ')}
-                        </span>
-                        {task.complexity && (
-                          <span className={`text-xs ${getComplexityColor(task.complexity)}`}>
-                            {task.complexity} complexity
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(task.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
                     </div>
                   </div>
-                  <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
-                      expandedTasks.has(task.id) ? 'rotate-180' : ''
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  {/* Three Dots Menu */}
+                  <div className="relative">
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none"
+                      onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === task.id ? null : task.id) }}
+                    >
+                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="5" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
+                      </svg>
+                    </button>
+                    {menuOpen === task.id && (
+                      <div ref={menuRef} className="absolute right-0 mt-2 w-32 bg-white dark:bg-[#23233a] border border-gray-200 dark:border-[#444] rounded shadow-lg z-10">
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-[#333]"
+                          onClick={e => { e.stopPropagation(); setMenuOpen(null); deleteTask(task.id) }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -440,7 +465,7 @@ export default function TaskList({ userId }: { userId: string }) {
                         />
                         <button
                           onClick={() => handleDownloadPDF(task.result)}
-                          className="text-blue-500 hover:text-blue-600 text-sm mt-2"
+                          className="text-white bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#6366f1] hover:to-[#6366f1] text-sm font-semibold px-4 py-2 rounded-lg transition mt-2"
                         >
                           Download as PDF
                         </button>

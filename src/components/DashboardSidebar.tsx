@@ -1,105 +1,65 @@
 'use client'
 
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
+const navItems = [
+  { label: 'Dashboard', href: '/dashboard', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6" /></svg>
+  ) },
+  { label: 'Tasks', href: '/tasks', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0h6" /></svg>
+  ) },
+  { label: 'Agents', href: '/agents', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3 1.343 3 3 3 3-1.343 3-3zm6 0c0-1.657-1.343-3-3-3s-3 1.343-3 3 1.343 3 3 3 3-1.343 3-3zm-6 8c0-2.21 3.582-4 8-4s8 1.79 8 4v2H4v-2c0-2.21 3.582-4 8-4z" /></svg>
+  ) },
+  { label: 'Profile', href: '/profile', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+  ) },
+  { label: 'Connections', href: '/connections', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" /></svg>
+  ) },
+]
+
 export default function DashboardSidebar() {
-  const menuItems = [
-    {
-      name: 'Dashboard',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-        </svg>
-      ),
-      href: '/dashboard',
-      active: true
-    },
-    {
-      name: 'Tasks',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
-      href: '#tasks',
-      active: false
-    },
-    {
-      name: 'Analytics',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      href: '/dashboard/analytics',
-      active: false
-    },
-    {
-      name: 'Settings',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      href: '#settings',
-      active: false
-    }
-  ]
+  const [collapsed, setCollapsed] = useState(false)
+  const router = useRouter()
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
 
   return (
-    <aside className="hidden lg:block w-64 bg-[#0a0a0a]/50 backdrop-blur-sm border-r border-[#1f1f1f] min-h-screen">
-      <div className="p-6">
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h3 className="text-white font-semibold mb-4 text-sm">Quick Actions</h3>
-          <div className="space-y-2">
-            <button className="w-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white py-2 px-4 rounded-lg hover:from-[#5b21b6] hover:to-[#6366f1] transition-all duration-200 text-sm font-medium">
-              New Task
-            </button>
-            <button className="w-full bg-[#1f1f1f] text-white py-2 px-4 rounded-lg hover:bg-[#2a2a2a] transition-all duration-200 text-sm font-medium border border-[#333]">
-              Import Data
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation Menu */}
-        <nav className="space-y-1">
-          {menuItems.map((item, index) => (
-            <a
-              key={index}
+    <aside
+      className={`sticky top-0 z-20 h-screen flex flex-col bg-white/60 dark:bg-[#18181b]/60 backdrop-blur-xl shadow-xl border-r border-[#e5e7eb]/60 dark:border-[#23233a]/60 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'} group`}
+      onMouseEnter={() => setCollapsed(false)}
+      onMouseLeave={() => setCollapsed(true)}
+    >
+      <div className="flex-1 flex flex-col py-8 space-y-2">
+        {navItems.map((item) => {
+          const isActive = currentPath.startsWith(item.href.replace(/#.*$/, ''))
+          return (
+            <Link
+              key={item.href}
               href={item.href}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm ${
-                item.active
-                  ? 'bg-[#1f1f1f] text-white border-l-4 border-[#6366f1]'
-                  : 'text-gray-400 hover:bg-[#1f1f1f] hover:text-white'
-              }`}
+              className={`flex items-center gap-4 px-5 py-3 rounded-xl transition-all duration-200 font-medium text-gray-700 dark:text-gray-200 hover:bg-[#6366f1]/10 hover:text-[#6366f1] ${isActive ? 'bg-[#6366f1]/20 text-[#6366f1]' : ''} ${collapsed ? 'justify-center px-2' : ''}`}
             >
-              {item.icon}
-              <span className="font-medium">{item.name}</span>
-            </a>
-          ))}
-        </nav>
-
-        {/* Recent Activity */}
-        <div className="mt-8">
-          <h3 className="text-white font-semibold mb-4 text-sm">Recent Activity</h3>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 bg-[#1f1f1f] rounded-lg border border-[#333]">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-white text-sm">Task completed</p>
-                <p className="text-gray-400 text-xs">2 minutes ago</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 bg-[#1f1f1f] rounded-lg border border-[#333]">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-white text-sm">New task created</p>
-                <p className="text-gray-400 text-xs">5 minutes ago</p>
-              </div>
-            </div>
-          </div>
-        </div>
+              <span className="shrink-0">{item.icon}</span>
+              <span className={`truncate transition-all duration-200 ${collapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+      <div className={`flex items-center justify-center pb-6 ${collapsed ? 'w-full' : 'justify-end pr-4'}`}>
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="p-2 rounded-full bg-white/40 dark:bg-[#23233a]/40 hover:bg-white/70 dark:hover:bg-[#23233a]/70 transition-colors"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          )}
+        </button>
       </div>
     </aside>
   )

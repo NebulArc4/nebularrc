@@ -1,24 +1,18 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { taskTemplates, getTemplatesByCategory, getCategories, TaskTemplate } from '@/lib/task-templates'
 import { modelManager, AIModel } from '@/lib/model-manager'
 import toast, { Toaster } from 'react-hot-toast'
-import jsPDF from 'jspdf'
-import * as pdfjsLib from 'pdfjs-dist'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
-// Fix for Next.js: set workerSrc to CDN
-if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
-}
-
-interface TaskSubmissionFormProps {
+export interface TaskSubmissionFormProps {
   user: User
+  onSuccess?: () => void
 }
 
-export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
+const TaskSubmissionForm: React.FC<TaskSubmissionFormProps> = ({ user, onSuccess }) => {
   const [taskPrompt, setTaskPrompt] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null)
@@ -33,6 +27,9 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   const [result, setResult] = useState<string | null>(null)
   const [pdfExtractedText, setPdfExtractedText] = useState<string>('')
   const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const taskTypes = [
     { id: 'general', name: 'General', description: 'General AI assistance' },
@@ -75,6 +72,14 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
   }
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
+    if (typeof window === 'undefined') return ''
+    
+    const pdfjsLib = await import('pdfjs-dist')
+    // Set worker source dynamically
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+    }
+    
     const arrayBuffer = await file.arrayBuffer()
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
     let text = ''
@@ -135,6 +140,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         const data = await response.json()
         setResult(data.task?.result || null)
         toast.success('Task submitted successfully!')
+        if (onSuccess) onSuccess()
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to submit task.')
@@ -146,15 +152,18 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
     }
   }
 
-  const handleDownloadPDF = () => {
-    if (!result) return
-    const doc = new jsPDF()
-    doc.text(result, 10, 10)
-    doc.save('ai-task-result.pdf')
+  const handleDownloadPDF = async (result?: string) => {
+    if (typeof window === 'undefined') return;
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    doc.text(result || '', 10, 10);
+    doc.save('ai-task-result.pdf');
   }
 
   const handleDownloadAnnotatedPDF = async () => {
-    if (!result || !pdfFile) return
+    if (!result || !pdfFile || typeof window === 'undefined') return
+    
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
     const existingPdfBytes = await pdfFile.arrayBuffer()
     const pdfDoc = await PDFDocument.load(existingPdfBytes)
     const page = pdfDoc.addPage()
@@ -188,22 +197,46 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         t.description.toLowerCase().includes(templateSearch.toLowerCase())
       )
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragActive(true)
+  }
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragActive(false)
+  }
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragActive(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type === 'application/pdf') {
+      await handleFileChange({ target: { files: [file] } } as any)
+    } else {
+      setError('Please upload a valid PDF file.')
+    }
+  }
+
   return (
-    <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
+    <div className="bg-gray-50/90 dark:bg-gray-900/50 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-xl p-6">
       <Toaster position="top-right" />
       {/* PDF Upload Section - always visible at the top */}
-      <div className="mb-6">
-        <label className="block text-sm font-bold text-white mb-2 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-[#6366f1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Upload PDF (optional)
+      <div
+        className={`mb-6 border-2 border-dashed rounded-xl transition-all duration-200 ${dragActive ? 'border-[#6366f1] bg-[#6366f1]/10' : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-[#23233a]/40'}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <label className="block text-sm font-bold text-[#6366f1] mb-2 flex items-center px-4 pt-4">
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Drag & drop a PDF or click to upload (optional)
         </label>
         {showPdfPreview ? (
-          <div className="flex items-start space-x-4">
+          <div className="flex items-start space-x-4 px-4 pb-4">
             <textarea
               value={pdfExtractedText}
               onChange={(e) => setPdfExtractedText(e.target.value)}
               rows={6}
-              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
               placeholder="Extracted text..."
               required={false}
               disabled={loading}
@@ -211,7 +244,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
             <button
               type="button"
               onClick={handleRemovePdf}
-              className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700 mt-2"
+              className="px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 mt-2"
             >
               Remove PDF
             </button>
@@ -221,12 +254,12 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
             type="file"
             accept=".pdf"
             onChange={handleFileChange}
-            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+            className="w-full px-3 py-2 bg-transparent border-none focus:outline-none"
           />
         )}
       </div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">Submit AI Task</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Submit AI Task</h2>
         <div className="flex space-x-2">
           <button
             type="button"
@@ -247,7 +280,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
 
       {/* Task Type Selector */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-3">Task Type</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Task Type</label>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {taskTypes.map(taskType => (
             <button
@@ -256,12 +289,12 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
               onClick={() => setSelectedTaskType(taskType.id)}
               className={`p-3 rounded-lg border transition-colors text-left ${
                 selectedTaskType === taskType.id
-                  ? 'bg-[#6366f1]/20 border-[#6366f1] text-white'
-                  : 'bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-800/70'
+                  ? 'bg-[#6366f1]/20 border-[#6366f1] text-[#6366f1] dark:text-white'
+                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/70'
               }`}
             >
               <div className="font-medium text-sm">{taskType.name}</div>
-              <div className="text-xs text-gray-400 mt-1">{taskType.description}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{taskType.description}</div>
             </button>
           ))}
         </div>
@@ -269,14 +302,17 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
 
       {/* Task Templates */}
       {showTemplates && (
-        <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-[#18181b] rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="mb-4">
             <input
               type="text"
               placeholder="Search templates..."
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-[#23233a] border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1] focus:bg-gray-100 dark:focus:bg-[#23233a]"
             />
           </div>
           
@@ -287,7 +323,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
                 className={`px-3 py-1 text-sm rounded-full transition-colors ${
                   selectedCategory === 'all'
                     ? 'bg-[#6366f1] text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 All
@@ -299,7 +335,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
                   className={`px-3 py-1 text-sm rounded-full transition-colors capitalize ${
                     selectedCategory === category
                       ? 'bg-[#6366f1] text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                   }`}
                 >
                   {category}
@@ -313,19 +349,19 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
               <div
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}
-                className="p-3 bg-gray-700/50 hover:bg-gray-700/70 rounded-lg cursor-pointer transition-colors border border-gray-600 hover:border-[#6366f1]/50"
+                className="p-3 bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700/70 rounded-lg cursor-pointer transition-colors border border-gray-200 dark:border-gray-600 hover:border-[#6366f1]/50"
               >
-                <h4 className="font-semibold text-white text-sm mb-1">{template.name}</h4>
-                <p className="text-gray-400 text-xs mb-2">{template.description}</p>
+                <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">{template.name}</h4>
+                <p className="text-gray-600 dark:text-gray-400 text-xs mb-2">{template.description}</p>
                 <div className="flex items-center justify-between">
                   <span className={`px-2 py-1 text-xs rounded-full ${
-                    template.complexity === 'low' ? 'bg-green-500/20 text-green-400' :
-                    template.complexity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-red-500/20 text-red-400'
+                    template.complexity === 'low' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
+                    template.complexity === 'medium' ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' :
+                    'bg-red-500/20 text-red-600 dark:text-red-400'
                   }`}>
                     {template.complexity}
                   </span>
-                  <span className="text-gray-500 text-xs">{template.estimatedTokens} tokens</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-xs">{template.estimatedTokens} tokens</span>
                 </div>
               </div>
             ))}
@@ -335,8 +371,8 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
 
       {/* Model Selector */}
       {showModelSelector && (
-        <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-          <h4 className="text-white font-semibold mb-3">Select AI Model</h4>
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+          <h4 className="text-gray-900 dark:text-white font-semibold mb-3">Select AI Model</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {availableModels.map(model => (
               <div
@@ -345,21 +381,21 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
                 className={`p-3 rounded-lg cursor-pointer transition-colors border ${
                   selectedModel?.id === model.id
                     ? 'bg-[#8b5cf6]/20 border-[#8b5cf6]'
-                    : 'bg-gray-700/50 border-gray-600 hover:bg-gray-700/70'
+                    : 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700/70'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h5 className="font-semibold text-white text-sm">{model.name}</h5>
+                  <h5 className="font-semibold text-gray-900 dark:text-white text-sm">{model.name}</h5>
                   <span className={`px-2 py-1 text-xs rounded-full ${
-                    model.quality === 'high' ? 'bg-green-500/20 text-green-400' :
-                    model.quality === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-red-500/20 text-red-400'
+                    model.quality === 'high' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
+                    model.quality === 'medium' ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' :
+                    'bg-red-500/20 text-red-600 dark:text-red-400'
                   }`}>
                     {model.quality}
                   </span>
                 </div>
-                <p className="text-gray-400 text-xs mb-2">{model.description}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <p className="text-gray-600 dark:text-gray-400 text-xs mb-2">{model.description}</p>
+                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                   <span>{model.speed}</span>
                   <span>{model.costPerToken === 0 ? 'Free' : `$${model.costPerToken}/token`}</span>
                 </div>
@@ -379,12 +415,12 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
                 setSelectedTemplate(null)
                 setTaskPrompt('')
               }}
-              className="text-gray-400 hover:text-white text-sm"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm"
             >
               Clear
             </button>
           </div>
-          <p className="text-gray-300 text-sm">{selectedTemplate.description}</p>
+          <p className="text-gray-600 dark:text-gray-300 text-sm">{selectedTemplate.description}</p>
         </div>
       )}
 
@@ -393,21 +429,21 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         <div className="mb-4 p-3 bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 rounded-lg">
           <div className="flex items-center justify-between">
             <h4 className="text-[#8b5cf6] font-semibold">Selected Model: {selectedModel.name}</h4>
-            <span className="text-gray-400 text-sm">{selectedModel.provider}</span>
+            <span className="text-gray-500 dark:text-gray-400 text-sm">{selectedModel.provider}</span>
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Task Prompt
           </label>
           <textarea
             value={taskPrompt}
             onChange={(e) => setTaskPrompt(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+            className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
             placeholder="Describe your AI task..."
             required
             disabled={loading}
@@ -432,14 +468,14 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
 
       {/* Input for link */}
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Enter Link
         </label>
         <input
           type="text"
           value={linkInput}
           onChange={handleLinkInput}
-          className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+          className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
           placeholder="Enter a link..."
         />
       </div>
@@ -450,21 +486,26 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-[#6366f1] font-semibold">Task Result</h4>
             <button
-              onClick={handleDownloadPDF}
-              className="text-gray-400 hover:text-white text-sm"
+              onClick={() => handleDownloadPDF(result)}
+              className="text-white bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#6366f1] hover:to-[#6366f1] text-sm font-semibold px-4 py-2 rounded-lg transition"
             >
               Download as PDF
             </button>
           </div>
           <button
             onClick={handleDownloadAnnotatedPDF}
-            className="text-gray-400 hover:text-white text-sm"
+            className="text-white bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#6366f1] hover:to-[#6366f1] text-sm font-semibold px-4 py-2 rounded-lg transition mt-2"
           >
             Download Annotated PDF
           </button>
-          <pre className="text-gray-300 text-sm">{result}</pre>
+          <pre className="text-gray-700 dark:text-gray-300 text-sm">{result}</pre>
         </div>
       )}
+
+      {error && <div className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2 mb-4 animate-fade-in">{error}</div>}
+      {success && <div className="text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-4 py-2 mb-4 animate-fade-in">{success}</div>}
     </div>
   )
 }
+
+export default TaskSubmissionForm

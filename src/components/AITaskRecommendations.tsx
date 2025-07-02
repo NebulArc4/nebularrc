@@ -119,11 +119,11 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
 
   if (loading) {
     return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
-        <h2 className="text-xl font-bold text-white mb-4">AI Task Recommendations</h2>
+      <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Task Recommendations</h2>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-gray-700 rounded"></div>
+            <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
           ))}
         </div>
       </div>
@@ -132,9 +132,9 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
 
   if (error) {
     return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
-        <h2 className="text-xl font-bold text-white mb-4">AI Task Recommendations</h2>
-        <div className="text-red-400 text-sm mb-3">{error}</div>
+      <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Task Recommendations</h2>
+        <div className="text-red-600 dark:text-red-400 text-sm mb-3">{error}</div>
         <button
           onClick={generateRecommendations}
           className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -146,12 +146,12 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
   }
 
   return (
-    <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
+    <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">AI Task Recommendations</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI Task Recommendations</h2>
         <button
           onClick={generateRecommendations}
-          className="p-2 text-gray-400 hover:text-white transition-colors"
+          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           title="Refresh recommendations"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,29 +164,29 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
         {recommendations.map((recommendation) => (
           <div
             key={recommendation.id}
-            className="bg-[#2a2a2a]/50 border border-[#444] rounded-lg p-4 hover:border-[#6366f1]/50 transition-colors"
+            className="bg-gray-50 dark:bg-[#2a2a2a]/50 border border-gray-200 dark:border-[#444] rounded-lg p-4 hover:border-[#6366f1]/50 transition-colors"
           >
             <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="font-semibold text-white text-sm mb-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">
                   {recommendation.title}
                 </h3>
-                <p className="text-gray-400 text-xs mb-2">
+                <p className="text-gray-600 dark:text-gray-400 text-xs mb-2">
                   {recommendation.description}
                 </p>
-                <p className="text-blue-400 text-xs">
+                <p className="text-blue-600 dark:text-blue-400 text-xs">
                   Why: {recommendation.reason}
                 </p>
               </div>
               <div className="flex items-center space-x-2">
                 <span className={`px-2 py-1 text-xs rounded-full ${
-                  recommendation.complexity === 'low' ? 'bg-green-500/20 text-green-400' :
-                  recommendation.complexity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                  'bg-red-500/20 text-red-400'
+                  recommendation.complexity === 'low' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
+                  recommendation.complexity === 'medium' ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' :
+                  'bg-red-500/20 text-red-600 dark:text-red-400'
                 }`}>
                   {recommendation.complexity}
                 </span>
-                <span className="text-gray-500 text-xs capitalize">
+                <span className="text-gray-500 dark:text-gray-500 text-xs capitalize">
                   {recommendation.category.replace('-', ' ')}
                 </span>
               </div>
@@ -204,8 +204,8 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
 
       {recommendations.length === 0 && (
         <div className="text-center py-8">
-          <div className="text-gray-400 text-sm mb-2">No recommendations available</div>
-          <div className="text-gray-500 text-xs">
+          <div className="text-gray-600 dark:text-gray-400 text-sm mb-2">No recommendations available</div>
+          <div className="text-gray-500 dark:text-gray-500 text-xs">
             Complete more tasks to get personalized recommendations
           </div>
         </div>

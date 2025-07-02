@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import jsPDF from 'jspdf'
 
 interface QuickActionsProps {
   user: User
@@ -152,18 +151,19 @@ export default function QuickActions({ user }: QuickActionsProps) {
 
   const selectedActionData = quickActions.find(action => action.id === selectedAction)
 
-  const handleDownloadPDF = () => {
-    if (!result) return
-    const doc = new jsPDF()
-    doc.text(result, 10, 10)
-    doc.save('ai-result.pdf')
+  const handleDownloadPDF = async (result?: string) => {
+    if (typeof window === 'undefined') return;
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    doc.text(result || '', 10, 10);
+    doc.save('ai-result.pdf');
   }
 
   return (
-    <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
+    <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">Quick Actions</h2>
-        <div className="text-sm text-gray-400">AI-powered tasks</div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quick Actions</h2>
+        <div className="text-sm text-gray-600 dark:text-gray-400">AI-powered tasks</div>
       </div>
       
       {!selectedAction ? (
@@ -172,15 +172,15 @@ export default function QuickActions({ user }: QuickActionsProps) {
             <button
               key={action.id}
               onClick={() => setSelectedAction(action.id)}
-              className="group relative p-4 rounded-lg bg-[#2a2a2a]/50 border border-[#444] hover:border-[#6366f1] transition-all duration-200 hover:bg-[#2a2a2a]/70"
+              className="group relative p-4 rounded-lg bg-gray-50 dark:bg-[#2a2a2a]/50 border border-gray-200 dark:border-[#444] hover:border-[#6366f1] transition-all duration-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a]/70"
             >
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${action.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-200`}>
                   {action.icon}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white text-sm">{action.title}</h3>
-                  <p className="text-xs text-gray-400 mt-1">{action.description}</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{action.title}</h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{action.description}</p>
                 </div>
               </div>
               
@@ -195,13 +195,13 @@ export default function QuickActions({ user }: QuickActionsProps) {
             <div className="flex items-center space-x-3">
               <button
                 onClick={resetAction}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </button>
-              <h3 className="text-lg font-semibold text-white">{selectedActionData?.title}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedActionData?.title}</h3>
             </div>
           </div>
 
@@ -212,28 +212,28 @@ export default function QuickActions({ user }: QuickActionsProps) {
               onChange={(e) => setContent(e.target.value)}
               placeholder={selectedActionData?.placeholder}
               rows={6}
-              className="w-full px-4 py-3 bg-[#2a2a2a]/50 border border-[#444] rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent text-white placeholder-gray-400 resize-none"
+              className="w-full px-4 py-3 bg-white dark:bg-[#2a2a2a]/50 border border-gray-300 dark:border-[#444] rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none"
               disabled={isSubmitting}
             />
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="text-red-400 text-sm bg-red-900/20 border border-red-500/20 rounded-lg p-3">
+            <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/20 rounded-lg p-3">
               {error}
             </div>
           )}
 
           {/* Result Area */}
           {result && (
-            <div className="bg-[#2a2a2a]/50 border border-[#444] rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Result</h4>
-              <div className="text-sm text-gray-300 whitespace-pre-wrap max-h-60 overflow-y-auto">
+            <div className="bg-gray-50 dark:bg-[#2a2a2a]/50 border border-gray-200 dark:border-[#444] rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Result</h4>
+              <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-60 overflow-y-auto">
                 {result}
               </div>
               <div className="mt-4 flex justify-end">
                 <button
-                  onClick={handleDownloadPDF}
+                  onClick={() => handleDownloadPDF(result)}
                   className="px-4 py-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#5b5beb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!result}
                 >
@@ -247,7 +247,7 @@ export default function QuickActions({ user }: QuickActionsProps) {
           <div className="flex justify-end space-x-3">
             <button
               onClick={resetAction}
-              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              className="px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
               disabled={isSubmitting}
             >
               Cancel

@@ -51,12 +51,12 @@ export default function AIInsights({ user }: AIInsightsProps) {
 
   if (loading) {
     return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
-        <h2 className="text-xl font-bold text-white mb-4">AI Insights</h2>
+      <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Insights</h2>
         <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-          <div className="h-4 bg-gray-700 rounded w-2/3"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
         </div>
       </div>
     )
@@ -64,9 +64,9 @@ export default function AIInsights({ user }: AIInsightsProps) {
 
   if (error) {
     return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
-        <h2 className="text-xl font-bold text-white mb-4">AI Insights</h2>
-        <div className="text-red-400 text-sm mb-3">{error}</div>
+      <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Insights</h2>
+        <div className="text-red-600 dark:text-red-400 text-sm mb-3">{error}</div>
         <button
           onClick={generateInsights}
           className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -79,20 +79,20 @@ export default function AIInsights({ user }: AIInsightsProps) {
 
   if (!insights) {
     return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
-        <h2 className="text-xl font-bold text-white mb-4">AI Insights</h2>
-        <div className="text-gray-400 text-sm">No insights available</div>
+      <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Insights</h2>
+        <div className="text-gray-600 dark:text-gray-400 text-sm">No insights available</div>
       </div>
     )
   }
 
   return (
-    <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
+    <div className="bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">AI Insights</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI Insights</h2>
         <button
           onClick={generateInsights}
-          className="p-2 text-gray-400 hover:text-white transition-colors"
+          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           title="Refresh insights"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,16 +105,16 @@ export default function AIInsights({ user }: AIInsightsProps) {
         {/* Key Insights */}
         {insights.insights.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-2 flex items-center">
-              <svg className="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Key Insights
             </h3>
             <ul className="space-y-1">
               {insights.insights.slice(0, 3).map((insight, index) => (
-                <li key={index} className="text-xs text-gray-400 flex items-start">
-                  <span className="text-blue-400 mr-2">•</span>
+                <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+                  <span className="text-blue-600 dark:text-blue-400 mr-2">•</span>
                   {insight}
                 </li>
               ))}
@@ -125,16 +125,16 @@ export default function AIInsights({ user }: AIInsightsProps) {
         {/* Recommendations */}
         {insights.recommendations.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-2 flex items-center">
-              <svg className="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Recommendations
             </h3>
             <ul className="space-y-1">
               {insights.recommendations.slice(0, 2).map((rec, index) => (
-                <li key={index} className="text-xs text-gray-400 flex items-start">
-                  <span className="text-green-400 mr-2">•</span>
+                <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+                  <span className="text-green-600 dark:text-green-400 mr-2">•</span>
                   {rec}
                 </li>
               ))}
@@ -145,13 +145,13 @@ export default function AIInsights({ user }: AIInsightsProps) {
         {/* Productivity Tips */}
         {insights.productivityTips.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-2 flex items-center">
-              <svg className="w-4 h-4 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Productivity Tip
             </h3>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               {insights.productivityTips[0]}
             </p>
           </div>
@@ -159,8 +159,8 @@ export default function AIInsights({ user }: AIInsightsProps) {
 
         {/* Usage Analysis */}
         {insights.usageAnalysis && (
-          <div className="pt-2 border-t border-gray-700">
-            <p className="text-xs text-gray-500">
+          <div className="pt-2 border-t border-gray-300 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-500">
               {insights.usageAnalysis}
             </p>
           </div>
