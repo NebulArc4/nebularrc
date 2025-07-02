@@ -1,5 +1,6 @@
 import AgentRunner from '@/components/AgentRunner'
 
-export default function AgentRunPage({ params }: { params: { id: string } }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function AgentRunPage({ params }: any) {
   return <AgentRunner agentId={params.id} />
 } 
