@@ -1,5 +1,6 @@
 import RunHistory from '@/components/RunHistory'
 
-export default function AgentRunHistoryPage({ params }: { params: { id: string } }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function AgentRunHistoryPage({ params }: any) {
   return <RunHistory agentId={params.id} />
 } 
