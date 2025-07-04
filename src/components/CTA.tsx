@@ -11,7 +11,7 @@ export default function CTA() {
           Ready to unlock your AI Twin?
         </h2>
         <p className="text-lg text-gray-300 mb-8">
-          Be among the first to experience Nebul<span className="text-red-500">A</span>rc's decision intelligence platform.
+          Be among the first to experience Nebul&apos;Arc&apos;s decision intelligence platform.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-8">

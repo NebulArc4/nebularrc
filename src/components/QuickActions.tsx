@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { User } from '@supabase/supabase-js'
 
 interface QuickActionsProps {
-  user: User
+  user?: User
 }
 
 interface QuickAction {
@@ -16,7 +16,7 @@ interface QuickAction {
   color: string
 }
 
-export default function QuickActions({ user }: QuickActionsProps) {
+export default function QuickActions({ }: QuickActionsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedAction, setSelectedAction] = useState<string | null>(null)
   const [content, setContent] = useState('')

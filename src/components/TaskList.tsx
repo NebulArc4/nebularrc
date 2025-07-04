@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import StockPriceChart, { searchSymbolByCompanyName } from './StockPriceChart'
+import useSWR from 'swr'
+import toast from 'react-hot-toast'
+import AIOutputRenderer from './AIOutputRenderer'
 
 interface Task {
   id: string
@@ -17,61 +21,61 @@ interface Task {
   tokens_used?: number
 }
 
+// Helper hook to extract stock symbol or company name and resolve to symbol
+function useResolvedSymbol(text: string): string | null {
+  const [resolvedSymbol, setResolvedSymbol] = useState<string | null>(null)
+  useEffect(() => {
+    // Try regex for symbol first
+    const match = text.match(/\b[A-Z]{1,5}\b/g)
+    const blacklist = ['THE', 'AND', 'FOR', 'WITH', 'FROM', 'THIS', 'THAT', 'YOUR', 'HAVE', 'WILL', 'SHOULD', 'COULD', 'MIGHT', 'ABOUT', 'WHICH', 'THERE', 'THEIR', 'WHAT', 'WHEN', 'WHERE', 'WHO', 'WHY', 'HOW']
+    const symbol = match?.find(s => !blacklist.includes(s)) || null
+    if (symbol) {
+      setResolvedSymbol(symbol)
+      return
+    }
+    // If no symbol, look for company name if context is investment
+    const investmentKeywords = ['invest', 'investment', 'stock', 'buy', 'sell', 'portfolio', 'shares', 'market', 'equity', 'ipo', 'dividend']
+    const lower = text.toLowerCase()
+    if (investmentKeywords.some(k => lower.includes(k))) {
+      // Try to find a capitalized word (company name)
+      const nameMatch = text.match(/\b([A-Z][a-z]+)\b/)
+      if (nameMatch) {
+        searchSymbolByCompanyName(nameMatch[1]).then(sym => {
+          if (sym) setResolvedSymbol(sym)
+        })
+      }
+    }
+  }, [text])
+  return resolvedSymbol
+}
+
 export default function TaskList({ userId }: { userId: string }) {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const { data: tasks = [], error, isLoading, mutate } = useSWR('/api/tasks')
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'complexity'>('date')
   const supabase = createClientComponentClient()
 
-  const fetchTasks = async () => {
-    try {
-      const response = await fetch('/api/tasks')
-      if (response.ok) {
-        const data = await response.json()
-        const sortedTasks = Array.isArray(data) ? data.sort((a: Task, b: Task) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ) : []
-        setTasks(sortedTasks)
-        setFilteredTasks(sortedTasks)
-        
-        // Auto-expand the latest task if there are tasks
-        if (sortedTasks.length > 0) {
-          setExpandedTasks(new Set([sortedTasks[0].id]))
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
+  useEffect(() => {
+    if (error) toast.error('Error fetching tasks')
+  }, [error])
 
   // Filter and sort tasks based on search query, status filter, and sort preference
   useEffect(() => {
     let filtered = tasks
-
-    // Apply search filter
     if (searchQuery.trim()) {
-      filtered = filtered.filter(task =>
+      filtered = filtered.filter((task: Task) =>
         task.task_prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (task.result && task.result.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (task.category && task.category.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     }
-
-    // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(task => task.status === statusFilter)
+      filtered = filtered.filter((task: Task) => task.status === statusFilter)
     }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
+    filtered.sort((a: Task, b: Task) => {
       switch (sortBy) {
         case 'date':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -85,14 +89,11 @@ export default function TaskList({ userId }: { userId: string }) {
           return 0
       }
     })
-
     setFilteredTasks(filtered)
   }, [tasks, searchQuery, statusFilter, sortBy])
 
+  // Real-time updates (keep as is, but call mutate on change)
   useEffect(() => {
-    fetchTasks()
-    
-    // Set up Supabase real-time subscription for this user's tasks
     const channel = supabase.channel('realtime-tasks')
       .on(
         'postgres_changes',
@@ -102,18 +103,15 @@ export default function TaskList({ userId }: { userId: string }) {
           table: 'tasks',
           filter: `user_id=eq.${userId}`
         },
-        (payload) => {
-          // On any change, re-fetch tasks
-          setRefreshing(true)
-          fetchTasks()
+        () => {
+          mutate()
         }
       )
       .subscribe()
-
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId])
+  }, [userId, supabase, mutate])
 
   const toggleTaskExpansion = (taskId: string) => {
     setExpandedTasks(prev => {
@@ -240,29 +238,30 @@ export default function TaskList({ userId }: { userId: string }) {
       .replace(/\n/g, '<br>')
   }
 
-  const getTaskPreview = (task: Task): string => {
-    const prompt = task.task_prompt || ''
-    const result = task.result || ''
-    
-    if (result) {
-      // Return first 100 characters of result
-      return result.length > 100 ? result.substring(0, 100) + '...' : result
+  // Add helper to check overdue/urgent
+  const isOverdue = (task: Task) => task.status !== 'completed' && new Date(task.created_at) < new Date()
+  const isUrgent = (task: Task) => task.status === 'pending' && new Date(task.created_at) < new Date(Date.now() - 24*60*60*1000)
+
+  // Add delete handler
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+      if (error) throw error
+      mutate((prev: Task[] | undefined) => prev ? prev.filter((t: Task) => t.id !== taskId) : [], false)
+    } catch (err) {
+      alert('Failed to delete task')
     }
-    
-    // Return first 100 characters of prompt if no result
-    return prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            ))}
-          </div>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#333] p-6 animate-pulse">
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          ))}
         </div>
       </div>
     )
@@ -276,12 +275,12 @@ export default function TaskList({ userId }: { userId: string }) {
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tasks</h2>
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => fetchTasks()}
-              disabled={refreshing}
+              onClick={() => mutate()}
+              disabled={isLoading}
               className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               title="Refresh tasks"
             >
-              <svg className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -366,48 +365,56 @@ export default function TaskList({ userId }: { userId: string }) {
           {filteredTasks.map((task) => (
             <div
               key={task.id}
-              className="bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden"
+              className={`bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden ${isOverdue(task) ? 'border-red-500' : isUrgent(task) ? 'border-yellow-500' : ''}`}
             >
               {/* Task Header */}
               <div
-                className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333] transition-colors group flex items-center justify-between"
                 onClick={() => toggleTaskExpansion(task.id)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${getStatusColor(task.status)}`}>
-                      {getStatusIcon(task.status)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {task.task_prompt}
-                      </p>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
-                          {task.status.replace('_', ' ')}
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${getStatusColor(task.status)}`}>
+                    {getStatusIcon(task.status)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {task.task_prompt}
+                    </p>
+                    <div className="flex items-center space-x-4 mt-1">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
+                        {task.status.replace('_', ' ')}
+                      </span>
+                      {task.complexity && (
+                        <span className={`text-xs ${getComplexityColor(task.complexity)}`}>
+                          {task.complexity} complexity
                         </span>
-                        {task.complexity && (
-                          <span className={`text-xs ${getComplexityColor(task.complexity)}`}>
-                            {task.complexity} complexity
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(task.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
+                      )}
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(task.created_at).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
-                  <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
-                      expandedTasks.has(task.id) ? 'rotate-180' : ''
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
                 </div>
+                {/* Delete button, only visible on hover */}
+                <button
+                  className="ml-2 p-2 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-opacity opacity-0 group-hover:opacity-100"
+                  title="Delete task"
+                  onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform ${
+                    expandedTasks.has(task.id) ? 'rotate-180' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
 
               {/* Task Details (Expanded) */}
@@ -426,10 +433,7 @@ export default function TaskList({ userId }: { userId: string }) {
                     {task.result && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Result</h4>
-                        <div 
-                          className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#2a2a2a] p-3 rounded border prose prose-sm max-w-none"
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(task.result) }}
-                        />
+                        <AIOutputRenderer text={task.result} />
                       </div>
                     )}
 
@@ -472,6 +476,34 @@ export default function TaskList({ userId }: { userId: string }) {
                         </div>
                       )}
                     </div>
+
+                    {/* Category and Complexity Tags */}
+                    {task.category && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Category</p>
+                        <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-semibold mr-2">{task.category}</span>
+                      </div>
+                    )}
+                    {task.complexity && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Complexity</p>
+                        <span className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold mr-2">{task.complexity}</span>
+                      </div>
+                    )}
+
+                    {/* Overdue and Urgent Tags */}
+                    {isOverdue(task) && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                        <span className="px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold mr-2">Overdue</span>
+                      </div>
+                    )}
+                    {isUrgent(task) && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                        <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs font-semibold mr-2">Urgent</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

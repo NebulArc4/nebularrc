@@ -43,8 +43,10 @@ export default function Features() {
       if (el) observer.observe(el);
     });
 
+    // Copy refs.current to a variable for cleanup
+    const cleanupRefs = refs.current.slice();
     return () => {
-      refs.current.forEach((el) => {
+      cleanupRefs.forEach((el) => {
         if (el) observer.unobserve(el);
       });
     };

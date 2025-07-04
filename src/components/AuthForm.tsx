@@ -25,16 +25,9 @@ export default function AuthForm() {
     try {
       const {
         data: authData,
-        error: authError,
       } = isLogin
         ? await supabaseBrowser.auth.signInWithPassword({ email, password })
         : await supabaseBrowser.auth.signUp({ email, password })
-
-      if (authError) {
-        setMessage(authError.message)
-        setLoading(false)
-        return
-      }
 
       if (authData.user) {
         // Check if user has a profile
@@ -52,10 +45,9 @@ export default function AuthForm() {
           router.push('/onboarding')
         }
       }
-    } catch (error) {
-      setMessage('An error occurred. Please try again.')
-    } finally {
+    } catch {
       setLoading(false)
+      setMessage('An error occurred. Please try again.')
     }
   }
 

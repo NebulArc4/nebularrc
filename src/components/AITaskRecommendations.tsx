@@ -1,11 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-
-interface AITaskRecommendationsProps {
-  user: User
-}
 
 interface TaskRecommendation {
   id: string
@@ -17,7 +12,7 @@ interface TaskRecommendation {
   reason: string
 }
 
-export default function AITaskRecommendations({ user }: AITaskRecommendationsProps) {
+export default function AITaskRecommendations() {
   const [recommendations, setRecommendations] = useState<TaskRecommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,8 +27,8 @@ export default function AITaskRecommendations({ user }: AITaskRecommendationsPro
       setError(null)
 
       // Get user's recent activity for context
-      const response = await fetch('/api/tasks')
-      const tasks = await response.json()
+      // const response = await fetch('/api/tasks')
+      // const tasks = await response.json()
 
       // Generate recommendations using Groq AI
       const aiResponse = await fetch('/api/ai-insights', {

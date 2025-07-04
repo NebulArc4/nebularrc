@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { agentService } from '@/lib/agent-service'
 
 // Handle CORS preflight requests
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Also allow GET for testing
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     message: 'Agent cron endpoint is running',
     timestamp: new Date().toISOString(),

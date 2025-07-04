@@ -105,7 +105,7 @@ export class ModelManager {
     return availableModels.filter(model => model.speed === speed)
   }
 
-  getBestModelForTask(complexity: 'low' | 'medium' | 'high', category: string): AIModel {
+  getBestModelForTask(complexity: 'low' | 'medium' | 'high'): AIModel {
     const available = this.getAvailableModels()
     
     // Filter by complexity

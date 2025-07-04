@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 import { aiService } from '@/lib/ai-service'
 
-// Choose which AI service to use based on environment
-const activeAIService = aiService
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = getSupabaseServer()
     
@@ -105,7 +102,7 @@ export async function POST(request: NextRequest) {
         console.log('POST /api/tasks: AI processing completed:', aiResponse.status)
 
         // Update task with result
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
           status: aiResponse.status === 'completed' ? 'completed' : 'failed',
           updated_at: new Date().toISOString()
         }
@@ -233,63 +230,5 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Error in DELETE /api/tasks:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-// Async function to process tasks in the background
-async function processTaskAsync(taskId: string, prompt: string, userId: string) {
-  try {
-    const supabase = getSupabaseServer()
-    
-    // Update status to in_progress
-    await supabase
-      .from('tasks')
-      .update({ 
-        status: 'in_progress',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskId)
-
-    // Process with AI
-    const aiResponse = await aiService.processTask({
-      taskId,
-      prompt,
-      userId
-    })
-
-    // Update with result
-    const updateData: any = {
-      status: aiResponse.status === 'completed' ? 'completed' : 'failed',
-      updated_at: new Date().toISOString()
-    }
-
-    if (aiResponse.status === 'completed') {
-      updateData.result = aiResponse.result
-      updateData.model_used = aiResponse.model
-      updateData.tokens_used = aiResponse.tokensUsed
-    } else {
-      updateData.error_message = aiResponse.error
-    }
-
-    await supabase
-      .from('tasks')
-      .update(updateData)
-      .eq('id', taskId)
-
-    console.log(`Task ${taskId} processed successfully with AI service`)
-
-  } catch (error) {
-    console.error(`Error processing task ${taskId}:`, error)
-    
-    // Update task with error
-    const supabase = getSupabaseServer()
-    await supabase
-      .from('tasks')
-      .update({
-        status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskId)
   }
 } 

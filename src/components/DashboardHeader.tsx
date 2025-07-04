@@ -6,7 +6,7 @@ import ThemeToggle from './ThemeToggle'
 
 interface DashboardHeaderProps {
   user: User
-  profile: any
+  profile: Record<string, unknown>
 }
 
 export default function DashboardHeader({ user, profile }: DashboardHeaderProps) {
@@ -144,15 +144,15 @@ export default function DashboardHeader({ user, profile }: DashboardHeaderProps)
               >
                 <div className="w-7 h-7 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-full flex items-center justify-center">
                   <span className="text-white font-semibold text-xs">
-                    {profile?.name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                    {typeof profile.name === 'string' ? profile.name.charAt(0) : (user.email?.charAt(0) || 'U')}
                   </span>
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-white font-medium text-sm">
-                    {profile?.name || user.email?.split('@')[0]}
+                    {typeof profile.name === 'string' ? profile.name : (user.email?.split('@')[0] || 'User')}
                   </p>
                   <p className="text-gray-400 text-xs">
-                    {profile?.role || 'User'}
+                    {typeof profile.role === 'string' ? profile.role : 'User'}
                   </p>
                 </div>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

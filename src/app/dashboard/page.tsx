@@ -1,16 +1,12 @@
 import { getSupabaseServer } from '@/lib/supabase-server'
-import { redirect } from 'next/navigation'
-import TaskSubmissionForm from '@/components/TaskSubmissionForm'
-import TaskList from '@/components/TaskList'
+// import { redirect } from 'next/navigation'
 import DashboardHeader from '@/components/DashboardHeader'
 import DashboardStats from '@/components/DashboardStats'
 import DashboardSidebar from '@/components/DashboardSidebar'
-import ModelPerformanceDashboard from '@/components/ModelPerformanceDashboard'
-import AgentManager from '@/components/AgentManager'
 import QuickActions from '@/components/QuickActions'
-import RecentActivity from '@/components/RecentActivity'
 import AIInsights from '@/components/AIInsights'
 import AITaskRecommendations from '@/components/AITaskRecommendations'
+import JoinTeamButton from '@/components/JoinTeamButton'
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic'
@@ -153,7 +149,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="relative z-10">
-        <DashboardHeader user={user} profile={profile} />
+        <DashboardHeader user={user} profile={profile || {}} />
         
         <div className="flex">
           <DashboardSidebar />
@@ -182,6 +178,9 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-4 flex justify-end">
+                  <JoinTeamButton />
+                </div>
                 
                 {profileLoading && (
                   <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">Loading profile...</div>
@@ -206,7 +205,7 @@ export default async function DashboardPage() {
 
               {/* AI Task Recommendations */}
               <div className="mb-8">
-                <AITaskRecommendations user={user} />
+                <AITaskRecommendations />
               </div>
 
               {/* Enhanced Stats Cards */}
@@ -218,33 +217,9 @@ export default async function DashboardPage() {
                 <DashboardStats stats={taskStats} agentStats={agentStats} />
               )}
 
-              {/* Main Content Grid - Enhanced Layout */}
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-8">
-                {/* Task Submission */}
-                <div className="xl:col-span-1">
-                  <TaskSubmissionForm user={user} />
-                </div>
-
-                {/* Task List */}
-                <div className="xl:col-span-2">
-                  <TaskList userId={user.id} />
-                </div>
-
-                {/* Sidebar with Recent Activity and AI Insights */}
-                <div className="xl:col-span-1 space-y-6">
-                  <RecentActivity tasks={recentTasks} />
-                  <AIInsights user={user} />
-                </div>
-              </div>
-
-              {/* AI Agents Section */}
+              {/* AI Insights Section */}
               <div className="mb-8">
-                <AgentManager />
-              </div>
-
-              {/* Model Performance Dashboard */}
-              <div className="mb-8">
-                <ModelPerformanceDashboard />
+                <AIInsights user={user} />
               </div>
             </div>
           </main>

@@ -61,7 +61,7 @@ export default function WaitlistForm() {
         </div>
       ) : (
         <p className="text-green-400 mt-4 text-lg font-medium">
-          ✅ You're on the waitlist!
+          ✅ You&apos;re on the waitlist!
         </p>
       )}
       {error && <p className="text-red-400 mt-3">{error}</p>}

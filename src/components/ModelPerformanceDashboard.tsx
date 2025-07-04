@@ -2,26 +2,23 @@
 
 import { useState, useEffect } from 'react'
 import { modelManager, AIModel, ModelPerformance } from '@/lib/model-manager'
+import useSWR from 'swr'
+import toast from 'react-hot-toast'
 
 export default function ModelPerformanceDashboard() {
-  const [models, setModels] = useState<AIModel[]>([])
-  const [performanceData, setPerformanceData] = useState<ModelPerformance[]>([])
-  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const { data: models = [], error: modelsError, isLoading: modelsLoading } = useSWR('/api/models')
+  const { data: performanceData = [], error: perfError, isLoading: perfLoading } = useSWR('/api/models/performance')
 
   useEffect(() => {
-    const availableModels = modelManager.getAvailableModels()
-    const performance = modelManager.getAllPerformanceData()
-    
-    setModels(availableModels)
-    setPerformanceData(performance)
-  }, [])
+    if (modelsError || perfError) toast.error('Error loading model data')
+  }, [modelsError, perfError])
 
   const getModelPerformance = (modelId: string) => {
-    return performanceData.find(p => p.modelId === modelId)
+    return performanceData.find((p: any) => p.modelId === modelId)
   }
 
   const getTopPerformingModels = () => {
-    return modelManager.getTopPerformingModels(3)
+    return models.slice(0, 3)
   }
 
   const formatResponseTime = (time: number) => {
@@ -53,6 +50,19 @@ export default function ModelPerformanceDashboard() {
     }
   }
 
+  if (modelsLoading || perfLoading) {
+    return (
+      <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 animate-pulse">
+        <div className="h-6 bg-gray-700 rounded w-1/4 mb-4"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-gray-800 rounded"></div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
@@ -67,7 +77,7 @@ export default function ModelPerformanceDashboard() {
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-white mb-3">Top Performing Models</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {getTopPerformingModels().map((model, index) => {
+          {getTopPerformingModels().map((model: AIModel, index: number) => {
             const perf = getModelPerformance(model.id)
             return (
               <div key={model.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
@@ -117,7 +127,7 @@ export default function ModelPerformanceDashboard() {
               </tr>
             </thead>
             <tbody>
-              {models.map(model => {
+              {models.map((model: AIModel) => {
                 const perf = getModelPerformance(model.id)
                 return (
                   <tr key={model.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
@@ -166,7 +176,7 @@ export default function ModelPerformanceDashboard() {
           <div>
             <h4 className="text-sm font-medium text-gray-300 mb-2">For Quick Tasks (Low Complexity)</h4>
             <div className="space-y-1">
-              {modelManager.getModelRecommendations('quick', 'low').map(model => (
+              {modelManager.getModelRecommendations('quick', 'low').map((model: AIModel) => (
                 <div key={model.id} className="flex items-center justify-between text-xs">
                   <span className="text-gray-400">{model.name}</span>
                   <span className="text-green-400">Fast & Free</span>
@@ -177,7 +187,7 @@ export default function ModelPerformanceDashboard() {
           <div>
             <h4 className="text-sm font-medium text-gray-300 mb-2">For Complex Analysis (High Complexity)</h4>
             <div className="space-y-1">
-              {modelManager.getModelRecommendations('analysis', 'high').map(model => (
+              {modelManager.getModelRecommendations('analysis', 'high').map((model: AIModel) => (
                 <div key={model.id} className="flex items-center justify-between text-xs">
                   <span className="text-gray-400">{model.name}</span>
                   <span className="text-blue-400">High Quality</span>

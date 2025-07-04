@@ -39,7 +39,7 @@ export class AgentService {
   }
 
   async createAgent(userId: string, agentData: Omit<Agent, 'id' | 'user_id' | 'total_runs' | 'created_at' | 'updated_at'>): Promise<Agent> {
-    const nextRun = this.calculateNextRun(agentData.schedule, agentData.custom_schedule)
+    const nextRun = this.calculateNextRun(agentData.schedule)
     
     const { data: agent, error } = await this.supabase
       .from('agents')
@@ -93,7 +93,7 @@ export class AgentService {
   }
 
   async updateAgent(agentId: string, userId: string, updates: Partial<Agent>): Promise<Agent> {
-    const nextRun = updates.schedule ? this.calculateNextRun(updates.schedule, updates.custom_schedule) : undefined
+    const nextRun = updates.schedule ? this.calculateNextRun(updates.schedule) : undefined
     
     const { data: agent, error } = await this.supabase
       .from('agents')
@@ -181,7 +181,7 @@ export class AgentService {
       const aiResponse = await this.executeAgentTask(agent, run.id, userId)
 
       // Update run with result
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: aiResponse.status === 'completed' ? 'completed' : 'failed',
         completed_at: new Date().toISOString()
       }
@@ -205,7 +205,7 @@ export class AgentService {
         .update({
           total_runs: agent.total_runs + 1,
           last_run: new Date().toISOString(),
-          next_run: this.calculateNextRun(agent.schedule, agent.custom_schedule)
+          next_run: this.calculateNextRun(agent.schedule)
         })
         .eq('id', agentId)
 
@@ -231,7 +231,14 @@ export class AgentService {
     }
   }
 
-  private async executeAgentTask(agent: Agent, taskId: string, userId: string): Promise<any> {
+  private async executeAgentTask(agent: Agent, taskId: string, userId: string): Promise<{
+    taskId: string;
+    result: string;
+    status: string;
+    model: string;
+    tokensUsed?: number;
+    error?: string;
+  }> {
     // Use Groq AI for all agent tasks
     const aiResponse = await aiService.processTask({
       taskId,
@@ -267,7 +274,7 @@ export class AgentService {
     return agents || []
   }
 
-  private calculateNextRun(schedule: string, customSchedule?: string): string {
+  private calculateNextRun(schedule: string): string {
     const now = new Date()
     
     switch (schedule) {

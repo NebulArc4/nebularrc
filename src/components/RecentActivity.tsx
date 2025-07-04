@@ -1,5 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
+import toast from 'react-hot-toast'
+
 interface Task {
   id: string
   task_prompt: string
@@ -9,10 +15,37 @@ interface Task {
 }
 
 interface RecentActivityProps {
-  tasks: Task[]
+  userId: string
+  limit?: number
 }
 
-export default function RecentActivity({ tasks }: RecentActivityProps) {
+export default function RecentActivity({ userId, limit = 5 }: RecentActivityProps) {
+  const { data: tasks = [], error, isLoading, mutate } = useSWR(`/api/tasks?userId=${userId}&limit=${limit}`)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (error) toast.error('Error loading recent activity')
+  }, [error])
+
+  useEffect(() => {
+    const channel = supabase.channel('realtime-activity')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${userId}`
+        },
+        () => mutate()
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId, limit, supabase, mutate])
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -71,6 +104,19 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
     return text.substring(0, maxLength) + '...'
   }
 
+  if (isLoading) {
+    return (
+      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6 animate-pulse">
+        <div className="h-6 bg-gray-700 rounded w-1/4 mb-4"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-[#222] rounded"></div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
@@ -90,7 +136,7 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {tasks.map((task, index) => (
+          {tasks.map((task: Task, index: number) => (
             <div key={task.id} className="relative">
               {/* Timeline line */}
               {index < tasks.length - 1 && (
@@ -130,7 +176,7 @@ export default function RecentActivity({ tasks }: RecentActivityProps) {
       
       {tasks.length > 0 && (
         <div className="mt-4 pt-4 border-t border-[#333]">
-          <button className="w-full text-center text-sm text-[#6366f1] hover:text-[#8b5cf6] transition-colors">
+          <button className="w-full text-center text-sm text-[#6366f1] hover:text-[#8b5cf6] transition-colors" onClick={() => router.push('/dashboard/activity')}>
             View all activity
           </button>
         </div>

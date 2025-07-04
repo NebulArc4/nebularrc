@@ -1,6 +1,11 @@
 'use client'
 
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
+
 export default function DashboardSidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
   const menuItems = [
     {
       name: 'Dashboard',
@@ -11,7 +16,6 @@ export default function DashboardSidebar() {
         </svg>
       ),
       href: '/dashboard',
-      active: true
     },
     {
       name: 'Tasks',
@@ -20,8 +24,16 @@ export default function DashboardSidebar() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      href: '#tasks',
-      active: false
+      href: '/dashboard/tasks',
+    },
+    {
+      name: 'Agents',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-5a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      href: '/dashboard/agents',
     },
     {
       name: 'Analytics',
@@ -31,7 +43,26 @@ export default function DashboardSidebar() {
         </svg>
       ),
       href: '/dashboard/analytics',
-      active: false
+    },
+    {
+      name: 'Connections',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-5a4 4 0 11-8 0 4 4 0 018 0z" />
+          <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ),
+      href: '/dashboard/connections',
+    },
+    {
+      name: 'Info',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16v-4m0-4h.01" />
+        </svg>
+      ),
+      href: '/dashboard/info',
     },
     {
       name: 'Settings',
@@ -42,8 +73,17 @@ export default function DashboardSidebar() {
         </svg>
       ),
       href: '#settings',
-      active: false
-    }
+    },
+    {
+      name: 'AI Decision Support',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01" />
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ),
+      href: '/dashboard/decision-support',
+    },
   ]
 
   return (
@@ -53,7 +93,10 @@ export default function DashboardSidebar() {
         <div className="mb-8">
           <h3 className="text-white font-semibold mb-4 text-sm">Quick Actions</h3>
           <div className="space-y-2">
-            <button className="w-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white py-2 px-4 rounded-lg hover:from-[#5b21b6] hover:to-[#6366f1] transition-all duration-200 text-sm font-medium">
+            <button
+              className="w-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white py-2 px-4 rounded-lg hover:from-[#5b21b6] hover:to-[#6366f1] transition-all duration-200 text-sm font-medium"
+              onClick={() => router.push('/dashboard/tasks?create=1')}
+            >
               New Task
             </button>
             <button className="w-full bg-[#1f1f1f] text-white py-2 px-4 rounded-lg hover:bg-[#2a2a2a] transition-all duration-200 text-sm font-medium border border-[#333]">
@@ -64,42 +107,24 @@ export default function DashboardSidebar() {
 
         {/* Navigation Menu */}
         <nav className="space-y-1">
-          {menuItems.map((item, index) => (
-            <a
-              key={index}
-              href={item.href}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm ${
-                item.active
-                  ? 'bg-[#1f1f1f] text-white border-l-4 border-[#6366f1]'
-                  : 'text-gray-400 hover:bg-[#1f1f1f] hover:text-white'
-              }`}
-            >
-              {item.icon}
-              <span className="font-medium">{item.name}</span>
-            </a>
-          ))}
+          {menuItems.map((item, index) => {
+            const isActive = pathname && (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)));
+            return (
+              <a
+                key={index}
+                href={item.href}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm ${
+                  isActive
+                    ? 'bg-[#1f1f1f] text-white border-l-4 border-[#6366f1]'
+                    : 'text-gray-400 hover:bg-[#1f1f1f] hover:text-white'
+                }`}
+              >
+                {item.icon}
+                <span className="font-medium">{item.name}</span>
+              </a>
+            );
+          })}
         </nav>
-
-        {/* Recent Activity */}
-        <div className="mt-8">
-          <h3 className="text-white font-semibold mb-4 text-sm">Recent Activity</h3>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 bg-[#1f1f1f] rounded-lg border border-[#333]">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-white text-sm">Task completed</p>
-                <p className="text-gray-400 text-xs">2 minutes ago</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 bg-[#1f1f1f] rounded-lg border border-[#333]">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-white text-sm">New task created</p>
-                <p className="text-gray-400 text-xs">5 minutes ago</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </aside>
   )

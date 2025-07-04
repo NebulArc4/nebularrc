@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
+import { User } from '@supabase/supabase-js'
 
-export default function OnboardingForm({ user }: { user: any }) {
+export default function OnboardingForm({ user }: { user: User }) {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,7 +32,7 @@ export default function OnboardingForm({ user }: { user: any }) {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto mt-20 px-4 text-white">
-      <h2 className="text-3xl font-bold mb-6">Let's get to know you!</h2>
+      <h2 className="text-3xl font-bold mb-6">&apos;Let&apos;s get to know you!</h2>
 
       <div className="mb-4">
         <label className="block mb-1">Your Name</label>

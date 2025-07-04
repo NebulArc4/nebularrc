@@ -25,7 +25,7 @@ export interface AIInsightsRequest {
     totalTasks: number
     completedTasks: number
     activeAgents: number
-    recentActivity: any[]
+    recentActivity: unknown[]
     taskCategories: string[]
   }
 }
@@ -42,6 +42,17 @@ export interface AIQuickActionRequest {
   content: string
   userId: string
   context?: string
+}
+
+export interface AIDecisionSupportRequest {
+  userId: string
+  decisionPrompt: string
+}
+
+export interface AIDecisionSupportResponse {
+  options: { option: string; outcome: string; probability?: string }[]
+  best: string
+  rationale: string
 }
 
 export class AIService {
@@ -87,8 +98,36 @@ export class AIService {
       taskId: `quick-${Date.now()}`,
       prompt,
       userId: request.userId,
-      taskType: request.actionType as any
+      taskType: request.actionType as 'analysis' | 'summarization' | 'translation' | 'code_review' | 'insights' | 'recommendations'
     })
+  }
+
+  async generateDecisionSupport(request: AIDecisionSupportRequest): Promise<AIDecisionSupportResponse> {
+    const prompt = `A user is facing the following decision:\n"""\n${request.decisionPrompt}\n"""\n\nAs an advanced AI, provide 2-4 possible options the user could take, the probable outcome of each, and which option you recommend as best.\n\nYour response MUST be concise, well-structured, and easy to scan.\n- Present options as a numbered list, each with a one-line outcome and probability.\n- Clearly state the best option.\n- Rationale should be a short summary (max 2 sentences).\n- Do NOT include markdown, explanations, or verbose text.\n\nFormat your response as JSON:\n{\n  "options": [\n    { "option": "...", "outcome": "...", "probability": "(optional)" },\n    ...\n  ],\n  "best": "...",\n  "rationale": "..."\n}`;
+
+    const response = await this.processWithGroq({
+      taskId: `decision-${Date.now()}`,
+      prompt,
+      userId: request.userId,
+      taskType: 'analysis'
+    })
+
+    // Try to parse the response as JSON
+    try {
+      const parsed = JSON.parse(response.result)
+      return {
+        options: parsed.options || [],
+        best: parsed.best || '',
+        rationale: parsed.rationale || ''
+      }
+    } catch (e) {
+      // Fallback: return the raw result as rationale
+      return {
+        options: [],
+        best: '',
+        rationale: response.result
+      }
+    }
   }
 
   private async processWithGroq(request: AITaskRequest): Promise<AITaskResponse> {
@@ -174,21 +213,21 @@ export class AIService {
     }
 
     if (request.taskType === 'analysis') {
-      prompt = `Please analyze the following data and provide comprehensive insights:\n\n${prompt}\n\nPlease structure your response with:\n1. Key Findings\n2. Patterns Identified\n3. Recommendations\n4. Action Items`
+      prompt = `Please analyze the following data and provide concise, well-structured insights:\n\n${prompt}\n\nYour response MUST be compact and easy to scan.\n- Use a numbered or bulleted list for findings and recommendations.\n- Limit each point to one sentence.\n- End with a brief summary (max 2 sentences).\n- Do NOT include markdown or verbose explanations.`
     }
 
     if (request.taskType === 'summarization') {
-      prompt = `Please create a concise summary of the following content:\n\n${prompt}\n\nFocus on the main points and key takeaways.`
+      prompt = `Please create a concise summary of the following content:\n\n${prompt}\n\nFocus on the main points and key takeaways. Limit your response to 3-5 bullet points and a one-sentence summary. Do NOT include markdown or extra explanation.`
     }
 
     if (request.taskType === 'code_review') {
-      prompt = `Please review the following code and provide feedback:\n\n${prompt}\n\nPlease structure your response with:\n1. Code Quality Assessment\n2. Security Considerations\n3. Performance Optimizations\n4. Best Practices Recommendations\n5. Specific Improvements`
+      prompt = `Please review the following code and provide feedback:\n\n${prompt}\n\nYour response MUST be short and structured.\n- Use a numbered list for issues and suggestions.\n- Limit each point to one sentence.\n- End with a brief summary.\n- Do NOT include markdown or verbose explanations.`
     }
 
     return prompt
   }
 
-  private buildInsightsPrompt(userData: any): string {
+  private buildInsightsPrompt(userData: AIInsightsRequest['userData']): string {
     return `Based on the following user data, provide personalized insights and recommendations:
 
 User Activity Summary:
@@ -225,7 +264,7 @@ Format your response as JSON with the following structure:
     return actionPrompts[request.actionType] || request.content
   }
 
-  private parseInsightsResponse(response: string): any {
+  private parseInsightsResponse(response: string): AIInsightsResponse {
     try {
       // Try to parse as JSON first
       const jsonMatch = response.match(/\{[\s\S]*\}/)

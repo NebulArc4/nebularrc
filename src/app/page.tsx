@@ -65,7 +65,7 @@ export default function Home() {
               </svg>
             </div>
             <h2 className="text-3xl font-bold text-white mb-4">Contact Coming Soon</h2>
-            <p className="text-gray-400 text-lg">We're working on something amazing.</p>
+            <p className="text-gray-400 text-lg">We&apos;re working on something amazing.</p>
           </div>
         </section>
       </main>

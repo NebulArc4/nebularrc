@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 import { aiService } from '@/lib/ai-service'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = getSupabaseServer()
     

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { agentService } from '@/lib/agent-service'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const templates = agentService.getAgentTemplates()
     return NextResponse.json(templates)

@@ -21,6 +21,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (actionType === 'decision_support') {
+      const { options, best, rationale } = await aiService.generateDecisionSupport({
+        userId: user.id,
+        decisionPrompt: content
+      })
+      return NextResponse.json({
+        success: true,
+        options,
+        best,
+        rationale
+      })
+    }
+
     // Process the quick action with Groq AI
     const result = await aiService.processQuickAction({
       actionType,

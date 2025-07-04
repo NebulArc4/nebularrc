@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import OnboardingForm from '@/components/OnboardingForm'
+import { User } from '@supabase/supabase-js'
 
 export default function OnboardingPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
     const getUser = async () => {

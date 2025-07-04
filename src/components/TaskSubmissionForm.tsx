@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { User } from '@supabase/supabase-js'
 import { taskTemplates, getTemplatesByCategory, getCategories, TaskTemplate } from '@/lib/task-templates'
 import { modelManager, AIModel } from '@/lib/model-manager'
@@ -8,9 +8,10 @@ import toast, { Toaster } from 'react-hot-toast'
 
 interface TaskSubmissionFormProps {
   user: User
+  autoFocus?: boolean
 }
 
-export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
+export default function TaskSubmissionForm({ user, autoFocus }: TaskSubmissionFormProps) {
   const [taskPrompt, setTaskPrompt] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null)
@@ -32,6 +33,13 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
 
   const categories = getCategories()
   const availableModels = modelManager.getAvailableModels()
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (autoFocus && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus]);
 
   useEffect(() => {
     // Set default model
@@ -78,12 +86,10 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
         setSelectedTemplate(null)
         toast.success('Task submitted successfully!')
       } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to submit task.')
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to submit task.')
       }
-    } catch (error) {
-      toast.error('An error occurred. Please try again.')
-    } finally {
+    } catch {
       setLoading(false)
     }
   }
@@ -280,6 +286,7 @@ export default function TaskSubmissionForm({ user }: TaskSubmissionFormProps) {
             Task Prompt
           </label>
           <textarea
+            ref={textareaRef}
             value={taskPrompt}
             onChange={(e) => setTaskPrompt(e.target.value)}
             rows={3}

@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import type { Session } from '@supabase/auth-helpers-nextjs'
 
 export default function TestPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
-  const [session, setSession] = useState<any>(null)
+  const [session, setSession] = useState<Session | null>(null)
 
   const handleLogin = async () => {
     try {
