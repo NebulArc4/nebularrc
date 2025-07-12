@@ -13,6 +13,7 @@ interface DecisionInput {
   budget_range?: string;
 }
 
+// --- ENHANCED AIAnalysis INTERFACE ---
 interface AIAnalysis {
   reasoning_steps: string[];
   technical_analysis: {
@@ -33,11 +34,34 @@ interface AIAnalysis {
     financial_risks: string[];
     funding_considerations: string[];
   };
-  risk_assessment: Record<string, string>;
-  recommendations: string[];
+  risk_assessment: Record<string, {
+    description: string;
+    confidence: number;
+    rationale: string;
+    severity: 'Low' | 'Medium' | 'High';
+  }>;
+  recommendations: Array<{
+    recommendation: string;
+    confidence: number;
+    rationale: string;
+    kpis: string[];
+    tags?: string[];
+  }>;
   estimated_impact: string;
   next_steps: string[];
   success_metrics: string[];
+  scenario_analysis: Array<{
+    scenario: string;
+    projected_outcome: string;
+    probability: number;
+    kpis: string[];
+  }>;
+  kpis: Array<{
+    name: string;
+    value: string | number;
+    unit?: string;
+    trend?: 'up' | 'down' | 'stable';
+  }>;
 }
 
 interface Decision {
@@ -131,16 +155,18 @@ async function getMemoryEnhancedAnalysis(decision: Decision): Promise<string> {
   financial_risks: array of strings with specific financial risks to mitigate,
   funding_considerations: array of strings with concrete funding requirements
 }
-- risk_assessment: object with specific risk levels and descriptions
-- recommendations: array of actionable strategic recommendations
+- risk_assessment: object where each key is a risk name and value is an object with { description, confidence (0-100), rationale, severity (Low/Medium/High) }
+- recommendations: array of objects with { recommendation, confidence (0-100), rationale, kpis (array), tags (array, optional) }
 - estimated_impact: string describing the concrete strategic impact
 - next_steps: array of strings with specific actions to take
 - success_metrics: array of strings with measurable success indicators
+- scenario_analysis: array of objects with { scenario, projected_outcome, probability (0-100), kpis (array) }
+- kpis: array of objects with { name, value, unit (optional), trend (up/down/stable, optional) }
 
 Strategic Decision Context:
 ${JSON.stringify(decision.decision_input, null, 2)}
 
-IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language.`;
+IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language. Include confidence scores, rationale, and KPIs for each major insight. Use scenario analysis where relevant.`;
   } else if (decision.brain_type === 'finance') {
     systemPrompt = 'You are a senior financial analyst with 15+ years of experience in investment management, risk assessment, and financial planning. You have worked with institutional investors, hedge funds, and Fortune 500 companies. Always respond with valid JSON only.';
     analysisPrompt = `As a senior financial analyst, provide a clear, actionable financial analysis for the following decision. Focus on RESULTS and IMPACTS, not analysis methodology. Provide a structured JSON response with the following fields:
@@ -340,8 +366,8 @@ async function getReasoningEnhancedAnalysis(decision: Decision): Promise<string>
   financial_risks: array of strings with specific financial risks to mitigate,
   funding_considerations: array of strings with concrete funding requirements
 }
-- risk_assessment: object with specific risk levels and descriptions
-- recommendations: array of actionable strategic recommendations
+- risk_assessment: object where each key is a risk name and value is an object with { description, confidence (0-100), rationale, severity (Low/Medium/High) }
+- recommendations: array of objects with { recommendation, confidence (0-100), rationale, kpis (array), tags (array, optional) }
 - estimated_impact: string describing the concrete strategic impact
 - next_steps: array of strings with specific actions to take
 - success_metrics: array of strings with measurable success indicators
@@ -589,6 +615,7 @@ export async function POST(req: NextRequest) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
   
+  // --- ENHANCED DEFAULT ANALYSIS ---
   function getDefaultAnalysis(status: string, errorMsg?: string): any {
     return {
       status,
@@ -617,6 +644,8 @@ export async function POST(req: NextRequest) {
       estimated_impact: '',
       next_steps: [],
       success_metrics: [],
+      scenario_analysis: [],
+      kpis: [],
     };
   }
 
