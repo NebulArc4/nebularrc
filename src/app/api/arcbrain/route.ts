@@ -166,7 +166,7 @@ async function getMemoryEnhancedAnalysis(decision: Decision): Promise<string> {
 Strategic Decision Context:
 ${JSON.stringify(decision.decision_input, null, 2)}
 
-IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language. Include confidence scores, rationale, and KPIs for each major insight. Use scenario analysis where relevant.`;
+IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language.`;
   } else if (decision.brain_type === 'finance') {
     systemPrompt = 'You are a senior financial analyst with 15+ years of experience in investment management, risk assessment, and financial planning. You have worked with institutional investors, hedge funds, and Fortune 500 companies. Always respond with valid JSON only.';
     analysisPrompt = `As a senior financial analyst, provide a clear, actionable financial analysis for the following decision. Focus on RESULTS and IMPACTS, not analysis methodology. Provide a structured JSON response with the following fields:
@@ -716,6 +716,16 @@ export async function POST(req: NextRequest) {
         predicted_impact: aiAnalysis.estimated_impact,
         predicted_recommendations: aiAnalysis.recommendations,
         predicted_risks: aiAnalysis.risk_assessment,
+        kpis: aiAnalysis.kpis,
+        scenario_analysis: aiAnalysis.scenario_analysis,
+        technical_analysis: aiAnalysis.technical_analysis,
+        strategic_insights: aiAnalysis.strategic_insights,
+        financial_analysis: aiAnalysis.financial_analysis,
+        risk_assessment: aiAnalysis.risk_assessment,
+        recommendations: aiAnalysis.recommendations,
+        estimated_impact: aiAnalysis.estimated_impact,
+        next_steps: aiAnalysis.next_steps,
+        success_metrics: aiAnalysis.success_metrics,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

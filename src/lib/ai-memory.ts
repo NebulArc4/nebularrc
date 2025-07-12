@@ -5,8 +5,18 @@ export interface DecisionMemory {
   decision_id: string;
   brain_type: string;
   predicted_impact: string;
-  predicted_recommendations: string[];
-  predicted_risks: Record<string, string>;
+  predicted_recommendations: any[];
+  predicted_risks: Record<string, any>;
+  kpis?: any[];
+  scenario_analysis?: any[];
+  technical_analysis?: any;
+  strategic_insights?: any;
+  financial_analysis?: any;
+  risk_assessment?: any;
+  recommendations?: any[];
+  estimated_impact?: string;
+  next_steps?: any[];
+  success_metrics?: any[];
   actual_outcome?: {
     success_level: 'excellent' | 'good' | 'moderate' | 'poor' | 'failed';
     actual_impact: string;
@@ -52,6 +62,16 @@ export class AIMemory {
           predicted_impact: decision.predicted_impact,
           predicted_recommendations: decision.predicted_recommendations,
           predicted_risks: decision.predicted_risks,
+          kpis: decision.kpis || [],
+          scenario_analysis: decision.scenario_analysis || [],
+          technical_analysis: decision.technical_analysis || {},
+          strategic_insights: decision.strategic_insights || {},
+          financial_analysis: decision.financial_analysis || {},
+          risk_assessment: decision.risk_assessment || {},
+          recommendations: decision.recommendations || [],
+          estimated_impact: decision.estimated_impact || '',
+          next_steps: decision.next_steps || [],
+          success_metrics: decision.success_metrics || [],
           actual_outcome: decision.actual_outcome,
           created_at: decision.created_at,
           updated_at: decision.updated_at,
