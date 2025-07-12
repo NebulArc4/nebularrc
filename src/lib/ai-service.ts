@@ -120,7 +120,7 @@ export class AIService {
         best: parsed.best || '',
         rationale: parsed.rationale || ''
       }
-    } catch (e) {
+    } catch {
       // Fallback: return the raw result as rationale
       return {
         options: [],

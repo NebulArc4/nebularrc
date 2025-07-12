@@ -6,12 +6,12 @@ const features = [
   {
     title: "Autonomous Agents",
     description:
-      "Deploy intelligent agents that act on your behalf — research, optimize, and execute tasks 24/7.",
+      "Deploy intelligent agents that act on your behalf — research, optimize, and execute analyses 24/7.",
   },
   {
     title: "Scalable AI Infrastructure",
     description:
-      "Built for high-performance — scale from single-agent tasks to enterprise-level simulations.",
+      "Built for high-performance — scale from single-agent analyses to enterprise-level simulations.",
   },
   {
     title: "Decision Intelligence",

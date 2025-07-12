@@ -1,106 +1,59 @@
 'use client'
 
-import { useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabase-browser'
-import type { Session } from '@supabase/auth-helpers-nextjs'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase-browser'
+import type { User } from '@supabase/supabase-js'
 
 export default function TestPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [message, setMessage] = useState('')
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const handleLogin = async () => {
-    try {
-      const { data, error } = await supabaseBrowser.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        setMessage(`Error: ${error.message}`)
-        return
+  useEffect(() => {
+    async function getUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      } catch (error) {
+        console.error('Error fetching user:', error)
+      } finally {
+        setLoading(false)
       }
+    }
 
-      setMessage('Login successful!')
-      setSession(data.session)
-      
-      // Check session immediately after login
-      const { data: { session: currentSession } } = await supabaseBrowser.auth.getSession()
-      console.log('Current session after login:', currentSession)
-      
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      setUser(null)
     } catch (error) {
-      setMessage(`Error: ${error}`)
+      console.error('Error signing out:', error)
     }
   }
 
-  const checkSession = async () => {
-    const { data: { session } } = await supabaseBrowser.auth.getSession()
-    console.log('Current session:', session)
-    setSession(session)
-  }
-
-  const signOut = async () => {
-    await supabaseBrowser.auth.signOut()
-    setSession(null)
-    setMessage('Signed out')
+  if (loading) {
+    return <div className="p-8">Loading...</div>
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <h1 className="text-3xl font-bold mb-6">Authentication Test</h1>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Test Page</h1>
       
-      <div className="max-w-md space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-gray-800 border border-white text-white"
-        />
-        
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-gray-800 border border-white text-white"
-        />
-        
-        <button
-          onClick={handleLogin}
-          className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
-        >
-          Login
-        </button>
-        
-        <button
-          onClick={checkSession}
-          className="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
-        >
-          Check Session
-        </button>
-        
-        <button
-          onClick={signOut}
-          className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
-        >
-          Sign Out
-        </button>
-        
-        {message && (
-          <p className="text-yellow-400">{message}</p>
-        )}
-        
-        {session && (
-          <div className="bg-gray-800 p-4 rounded">
-            <h3 className="font-bold">Session Info:</h3>
-            <p>User: {session.user.email}</p>
-            <p>Access Token: {session.access_token ? 'Present' : 'Missing'}</p>
-            <p>Refresh Token: {session.refresh_token ? 'Present' : 'Missing'}</p>
-          </div>
-        )}
-      </div>
+      {user ? (
+        <div>
+          <p>Welcome, {user.email}!</p>
+          <button
+            onClick={handleSignOut}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Sign Out
+          </button>
+        </div>
+      ) : (
+        <p>Not signed in</p>
+      )}
     </div>
   )
 } 

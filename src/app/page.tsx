@@ -1,7 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
-import CTA from "@/components/CTA";
 
 export default function Home() {
   return (
@@ -47,10 +46,6 @@ export default function Home() {
         {/* Features Section */}
         <section id="features" className="scroll-mt-20">
           <Features />
-        </section>
-
-        <section id="cta">
-          <CTA />
         </section>
 
         {/* Contact Section Placeholder */}

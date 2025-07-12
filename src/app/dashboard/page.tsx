@@ -3,10 +3,7 @@ import { getSupabaseServer } from '@/lib/supabase-server'
 import DashboardHeader from '@/components/DashboardHeader'
 import DashboardStats from '@/components/DashboardStats'
 import DashboardSidebar from '@/components/DashboardSidebar'
-import QuickActions from '@/components/QuickActions'
 import AIInsights from '@/components/AIInsights'
-import AITaskRecommendations from '@/components/AITaskRecommendations'
-import JoinTeamButton from '@/components/JoinTeamButton'
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic'
@@ -45,51 +42,7 @@ export default async function DashboardPage() {
     profileLoading = false
   }
 
-  // Get task statistics with error handling
-  let taskStats = {
-    total: 0,
-    pending: 0,
-    completed: 0,
-    inProgress: 0,
-  }
-  let tasksError = null
-  let tasksLoading = true
-  try {
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('status')
-      .eq('user_id', user.id)
-    taskStats = {
-      total: tasks?.length || 0,
-      pending: tasks?.filter(t => t.status === 'pending').length || 0,
-      completed: tasks?.filter(t => t.status === 'completed').length || 0,
-      inProgress: tasks?.filter(t => t.status === 'in_progress').length || 0,
-    }
-    tasksLoading = false
-  } catch (error) {
-    tasksError = error
-    tasksLoading = false
-  }
 
-  // Get recent tasks for activity feed
-  let recentTasks: Array<{
-    id: string
-    task_prompt: string
-    status: string
-    created_at: string
-    result?: string
-  }> = []
-  try {
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('id, task_prompt, status, created_at, result')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-    recentTasks = tasks || []
-  } catch (error) {
-    console.error('Error fetching recent tasks:', error)
-  }
 
   // Get agent statistics
   let agentStats = {
@@ -164,22 +117,16 @@ export default async function DashboardPage() {
                       Welcome back, {displayName}!
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 text-lg">
-                      Ready to tackle your next AI-powered task?
+                      Ready to run your next AI-powered analysis?
                     </p>
                   </div>
                   <div className="hidden lg:flex items-center space-x-4">
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Total Tasks</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{taskStats.total}</p>
-                    </div>
+
                     <div className="text-right">
                       <p className="text-sm text-gray-500 dark:text-gray-400">Active Agents</p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">{agentStats.active}</p>
                     </div>
                   </div>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <JoinTeamButton />
                 </div>
                 
                 {profileLoading && (
@@ -198,24 +145,10 @@ export default async function DashboardPage() {
                 )}
               </div>
 
-              {/* Quick Actions Section */}
-              <div className="mb-8">
-                <QuickActions user={user} />
-              </div>
-
-              {/* AI Task Recommendations */}
-              <div className="mb-8">
-                <AITaskRecommendations />
-              </div>
-
               {/* Enhanced Stats Cards */}
-              {tasksLoading ? (
-                <div className="mb-8 text-blue-600 dark:text-blue-400">Loading tasks...</div>
-              ) : tasksError ? (
-                <div className="mb-8 text-red-600 dark:text-red-400">Error loading tasks.</div>
-              ) : (
-                <DashboardStats stats={taskStats} agentStats={agentStats} />
-              )}
+              <div className="mb-8">
+                <DashboardStats agentStats={agentStats} />
+              </div>
 
               {/* AI Insights Section */}
               <div className="mb-8">

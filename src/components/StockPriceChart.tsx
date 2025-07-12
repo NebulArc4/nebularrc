@@ -12,10 +12,10 @@ import {
   Tooltip,
   Legend,
   TimeScale,
+  ChartOptions
 } from "chart.js";
 import "chartjs-adapter-date-fns";
 import { fetchStockPrices } from "@/lib/stock-service";
-import { usePreferences } from './PreferencesContext';
 
 ChartJS.register(
   CategoryScale,
@@ -39,8 +39,6 @@ interface StockPriceChartProps {
 }
 
 export default function StockPriceChart({ symbol: propSymbol }: StockPriceChartProps) {
-  const { prefs } = usePreferences();
-  const chartType = prefs.chartType;
   const [symbol, setSymbol] = useState(propSymbol || "AAPL");
   const [input, setInput] = useState(propSymbol || "AAPL");
   const [range, setRange] = useState<"day" | "month" | "year">("month");
@@ -58,8 +56,8 @@ export default function StockPriceChart({ symbol: propSymbol }: StockPriceChartP
     try {
       const prices = await fetchStockPrices(sym, rng);
       setData(prices);
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch data");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to fetch data");
       setData([]);
     } finally {
       setLoading(false);
@@ -90,7 +88,7 @@ export default function StockPriceChart({ symbol: propSymbol }: StockPriceChartP
     ],
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     plugins: {
       legend: { display: false },
@@ -141,7 +139,7 @@ export default function StockPriceChart({ symbol: propSymbol }: StockPriceChartP
       <select
         className="px-2 py-2 rounded border border-gray-700 bg-[#232336] text-white mb-4"
         value={range}
-        onChange={(e) => setRange(e.target.value as any)}
+        onChange={(e) => setRange(e.target.value as "day" | "month" | "year")}
       >
         {ranges.map((r) => (
           <option key={r.value} value={r.value}>{r.label}</option>

@@ -15,8 +15,8 @@ export default function DashboardHeader({ user, profile }: DashboardHeaderProps)
   const [notifications, setNotifications] = useState([
     {
       id: 1,
-      type: 'task',
-      message: 'Task "Summarize report" completed successfully.',
+      type: 'agent',
+      message: 'Agent "Data Analyzer" completed analysis successfully.',
       time: '2m ago',
       read: false
     },
@@ -63,8 +63,8 @@ export default function DashboardHeader({ user, profile }: DashboardHeaderProps)
             <a href="/dashboard" className="text-white hover:text-[#6366f1] transition-colors text-sm font-medium">
               Dashboard
             </a>
-            <a href="#tasks" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
-              Tasks
+            <a href="/dashboard/arc-brain" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
+              Arc Brain
             </a>
             <a href="/dashboard/analytics" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
               Analytics
@@ -107,11 +107,7 @@ export default function DashboardHeader({ user, profile }: DashboardHeaderProps)
                       {notifications.map((n) => (
                         <li key={n.id} className={`px-4 py-3 flex items-start space-x-3 ${n.read ? 'bg-transparent' : 'bg-[#23235a]/10'}`}>
                           <div className="mt-1">
-                            {n.type === 'task' && (
-                              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            )}
+
                             {n.type === 'agent' && (
                               <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

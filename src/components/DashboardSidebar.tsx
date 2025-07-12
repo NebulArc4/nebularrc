@@ -1,7 +1,6 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
@@ -17,14 +16,15 @@ export default function DashboardSidebar() {
       ),
       href: '/dashboard',
     },
+
     {
-      name: 'Tasks',
+      name: 'Arc Brain',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 0c2.5 2 4 4.5 4 7.5S14.5 17 12 17s-4-3-4-7.5S9.5 4 12 2z" />
         </svg>
       ),
-      href: '/dashboard/tasks',
+      href: '/dashboard/arc-brain',
     },
     {
       name: 'Agents',
@@ -74,16 +74,6 @@ export default function DashboardSidebar() {
       ),
       href: '#settings',
     },
-    {
-      name: 'AI Decision Support',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01" />
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      ),
-      href: '/dashboard/decision-support',
-    },
   ]
 
   return (
@@ -95,9 +85,9 @@ export default function DashboardSidebar() {
           <div className="space-y-2">
             <button
               className="w-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white py-2 px-4 rounded-lg hover:from-[#5b21b6] hover:to-[#6366f1] transition-all duration-200 text-sm font-medium"
-              onClick={() => router.push('/dashboard/tasks?create=1')}
+              onClick={() => router.push('/dashboard/arc-brain')}
             >
-              New Task
+              Arc Brain Analysis
             </button>
             <button className="w-full bg-[#1f1f1f] text-white py-2 px-4 rounded-lg hover:bg-[#2a2a2a] transition-all duration-200 text-sm font-medium border border-[#333]">
               Import Data

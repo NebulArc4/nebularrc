@@ -148,7 +148,7 @@ export default function AIOutputRenderer({ text }: AIOutputRendererProps) {
       <ReactMarkdown
         rehypePlugins={[rehypeRaw, rehypeHighlight]}
         components={{
-          span({ node, className, children }) {
+          span({ className, children }) {
             if (className === "entity-symbol")
               return <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1 rounded cursor-pointer" title="Stock Symbol">{children}</span>;
             if (className === "entity-company")
@@ -180,7 +180,7 @@ export default function AIOutputRenderer({ text }: AIOutputRendererProps) {
         {loadingSymbols ? (
           <div className="text-gray-400 text-sm">Loading charts...</div>
         ) : (
-          resolvedSymbols.map((symbol) => (
+          Array.isArray(resolvedSymbols) && resolvedSymbols.map((symbol) => (
             <div key={symbol} className="w-full md:w-1/2 lg:w-1/3">
               <h5 className="text-sm font-bold mb-2 text-gray-900 dark:text-white">Stock Price Chart for {symbol}</h5>
               <StockPriceChart symbol={symbol} />

@@ -156,21 +156,59 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_id ON agent_runs(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_user_id ON agent_runs(user_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_started_at ON agent_runs(started_at);
 
--- Create updated_at trigger function
+-- Drop existing policies if they exist (to avoid conflicts)
+DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
+DROP POLICY IF EXISTS "Allow all operations on ai_memories" ON ai_memories;
+
+-- Create AI memories table for persistent storage
+CREATE TABLE IF NOT EXISTS ai_memories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  decision_id TEXT NOT NULL UNIQUE,
+  brain_type TEXT NOT NULL,
+  predicted_impact TEXT NOT NULL,
+  predicted_recommendations JSONB NOT NULL DEFAULT '[]',
+  predicted_risks JSONB NOT NULL DEFAULT '{}',
+  actual_outcome JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_ai_memories_brain_type ON ai_memories(brain_type);
+CREATE INDEX IF NOT EXISTS idx_ai_memories_created_at ON ai_memories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_memories_decision_id ON ai_memories(decision_id);
+
+-- Create a function to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+  NEW.updated_at = NOW();
+  RETURN NEW;
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Create trigger to automatically update updated_at
+DROP TRIGGER IF EXISTS update_ai_memories_updated_at ON ai_memories;
+CREATE TRIGGER update_ai_memories_updated_at 
+  BEFORE UPDATE ON ai_memories 
+  FOR EACH ROW 
+  EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Add RLS (Row Level Security) policies
+ALTER TABLE ai_memories ENABLE ROW LEVEL SECURITY;
 
-CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON agents
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+-- Policy to allow all operations (you can restrict this based on user_id if needed)
+CREATE POLICY "Allow all operations on ai_memories" ON ai_memories
+  FOR ALL USING (true);
+
+-- Recreate existing policies for profiles table
+CREATE POLICY "Users can view their own profile" ON profiles
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" ON profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert their own profile" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id); 

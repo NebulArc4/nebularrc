@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: arcbrain-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: arcbrain
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./backend/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - arcbrain-network
+
+  # ArcBrain Backend API
+  backend:
+    build: ./backend
+    container_name: arcbrain-backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://admin:password123@mongodb:27017/arcbrain?authSource=admin
+      - DB_NAME=arcbrain
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+    networks:
+      - arcbrain-network
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: arcbrain-frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - arcbrain-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  mongodb_data:
+
+networks:
+  arcbrain-network:
+    driver: bridge 

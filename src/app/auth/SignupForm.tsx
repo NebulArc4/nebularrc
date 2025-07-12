@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabaseBrowser } from '@/lib/supabase-browser'
+import { supabase } from '@/lib/supabase-browser'
 
 export default function SignupForm() {
   const [email, setEmail] = useState('')
@@ -12,7 +12,7 @@ export default function SignupForm() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const { error } = await supabaseBrowser.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     })

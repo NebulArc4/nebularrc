@@ -3,7 +3,7 @@ import DashboardHeader from '@/components/DashboardHeader'
 import DashboardSidebar from '@/components/DashboardSidebar'
 import AgentManager from '@/components/AgentManager'
 import AgentsPageClient from '@/components/AgentsPageClient'
-import StockPriceChart from '@/components/StockPriceChart'
+import AdvancedAIInsights from '@/components/AdvancedAIInsights'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,15 +55,6 @@ export default async function AgentsPage() {
     }
   } catch (error) {
     console.error('Error fetching agent stats:', error)
-  }
-
-  // Helper to extract stock symbol from text
-  function extractStockSymbol(text: string): string | null {
-    const match = text.match(/\b[A-Z]{1,5}\b/g);
-    if (!match) return null;
-    const blacklist = ['THE', 'AND', 'FOR', 'WITH', 'FROM', 'THIS', 'THAT', 'YOUR', 'HAVE', 'WILL', 'SHOULD', 'COULD', 'MIGHT', 'ABOUT', 'WHICH', 'THERE', 'THEIR', 'WHAT', 'WHEN', 'WHERE', 'WHO', 'WHY', 'HOW'];
-    const symbol = match.find(s => !blacklist.includes(s));
-    return symbol || null;
   }
 
   return (
@@ -126,6 +117,14 @@ export default async function AgentsPage() {
               </div>
               <div className="mb-8">
                 <AgentManager />
+              </div>
+              
+              {/* AI Insights Section */}
+              <div className="mt-12">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  AI Agent Optimization
+                </h2>
+                <AdvancedAIInsights />
               </div>
             </div>
           </main>

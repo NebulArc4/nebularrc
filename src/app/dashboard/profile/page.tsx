@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
-import { supabaseBrowser } from '@/lib/supabase-browser'
+import { supabase } from '@/lib/supabase-browser'
 import { useTheme } from '@/components/ThemeProvider'
 
 interface Profile {
@@ -25,7 +25,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState('')
   const { theme, toggleTheme } = useTheme()
   
-  const supabase = supabaseBrowser
+
 
   useEffect(() => {
     async function loadProfile() {
@@ -42,7 +42,7 @@ export default function ProfilePage() {
       setLoading(false)
     }
     loadProfile()
-  }, [supabase])
+  }, [])
 
   const handleSaveProfile = async () => {
     if (!user || !profile) return
@@ -180,7 +180,7 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white">Email Notifications</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Receive email updates about your tasks</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Receive email updates about your AI analyses</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />

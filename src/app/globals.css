@@ -1,5 +1,6 @@
-@import "tailwindcss/preflight";
-@import "tailwindcss/utilities";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer utilities {
   .subtle-glow {
@@ -47,8 +48,6 @@
 .animate-glow {
   animation: glow 3s ease-in-out infinite;
 }
-
-@import "tailwindcss";
 
 :root {
   --background: #0a0a0a;

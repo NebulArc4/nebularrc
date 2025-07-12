@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { modelManager, AIModel, ModelPerformance } from '@/lib/model-manager'
+import React from 'react'
+import { useEffect } from 'react'
+import { modelManager, AIModel } from '@/lib/model-manager'
 import useSWR from 'swr'
 import toast from 'react-hot-toast'
 
@@ -14,7 +15,7 @@ export default function ModelPerformanceDashboard() {
   }, [modelsError, perfError])
 
   const getModelPerformance = (modelId: string) => {
-    return performanceData.find((p: any) => p.modelId === modelId)
+    return performanceData.find((p: { modelId: string }) => p.modelId === modelId)
   }
 
   const getTopPerformingModels = () => {
@@ -51,18 +52,11 @@ export default function ModelPerformanceDashboard() {
   }
 
   if (modelsLoading || perfLoading) {
-    return (
-      <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 animate-pulse">
-        <div className="h-6 bg-gray-700 rounded w-1/4 mb-4"></div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-gray-800 rounded"></div>
-          ))}
-        </div>
-      </div>
-    )
+    return <div>Loading...</div>;
   }
-
+  if (modelsError || perfError) {
+    return <div>Error loading model performance data.</div>;
+  }
   return (
     <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
@@ -174,7 +168,7 @@ export default function ModelPerformanceDashboard() {
         <h3 className="text-lg font-semibold text-white mb-3">Model Recommendations</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h4 className="text-sm font-medium text-gray-300 mb-2">For Quick Tasks (Low Complexity)</h4>
+                            <h4 className="text-sm font-medium text-gray-300 mb-2">For Quick Analysis (Low Complexity)</h4>
             <div className="space-y-1">
               {modelManager.getModelRecommendations('quick', 'low').map((model: AIModel) => (
                 <div key={model.id} className="flex items-center justify-between text-xs">

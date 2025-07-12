@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabase-browser'
+import { supabase } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 
@@ -15,7 +15,7 @@ export default function OnboardingForm({ user }: { user: User }) {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabaseBrowser.from('profiles').upsert({
+    const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       name,
       role,

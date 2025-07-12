@@ -1,50 +1,42 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
-import useSWR from 'swr'
-import toast from 'react-hot-toast'
-
-interface Task {
-  id: string
-  task_prompt: string
-  status: string
-  created_at: string
-  result?: string
-}
 
 interface RecentActivityProps {
   userId: string
   limit?: number
 }
 
-export default function RecentActivity({ userId, limit = 5 }: RecentActivityProps) {
-  const { data: tasks = [], error, isLoading, mutate } = useSWR(`/api/tasks?userId=${userId}&limit=${limit}`)
-  const supabase = createClientComponentClient()
+export default function RecentActivity({ }: RecentActivityProps) {
   const router = useRouter()
 
-  useEffect(() => {
-    if (error) toast.error('Error loading recent activity')
-  }, [error])
-
-  useEffect(() => {
-    const channel = supabase.channel('realtime-activity')
-      .on(
-        'postgres_changes',
+  // Mock data for recent activity since we removed tasks
+  const recentActivity = [
+    {
+      id: '1',
+      type: 'agent_run',
+      title: 'Data Analysis Agent',
+      status: 'completed',
+      created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+      description: 'Analyzed user productivity patterns'
+    },
         {
-          event: '*',
-          schema: 'public',
-          table: 'tasks',
-          filter: `user_id=eq.${userId}`
-        },
-        () => mutate()
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
+      id: '2',
+      type: 'system',
+      title: 'System Update',
+      status: 'completed',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+      description: 'AI models updated to latest version'
+    },
+    {
+      id: '3',
+      type: 'agent_run',
+      title: 'Financial Analysis',
+      status: 'completed',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), // 4 hours ago
+      description: 'Generated investment recommendations'
     }
-  }, [userId, limit, supabase, mutate])
+  ]
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,24 +51,21 @@ export default function RecentActivity({ userId, limit = 5 }: RecentActivityProp
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
+
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'agent_run':
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         )
-      case 'in_progress':
-        return (
-          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        )
-      case 'pending':
+      case 'system':
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         )
       default:
@@ -104,69 +93,54 @@ export default function RecentActivity({ userId, limit = 5 }: RecentActivityProp
     return text.substring(0, maxLength) + '...'
   }
 
-  if (isLoading) {
-    return (
-      <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6 animate-pulse">
-        <div className="h-6 bg-gray-700 rounded w-1/4 mb-4"></div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 bg-[#222] rounded"></div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-[#1a1a1a]/50 backdrop-blur-xl rounded-xl border border-[#333] p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-white">Recent Activity</h2>
-        <div className="text-sm text-gray-400">{tasks.length} tasks</div>
+        <div className="text-sm text-gray-400">{recentActivity.length} activities</div>
       </div>
       
-      {tasks.length === 0 ? (
+      {recentActivity.length === 0 ? (
         <div className="text-center py-8">
           <div className="w-12 h-12 mx-auto mb-4 bg-[#2a2a2a] rounded-full flex items-center justify-center">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <p className="text-gray-400 text-sm">No recent activity</p>
-          <p className="text-gray-500 text-xs mt-1">Start by creating your first task</p>
+          <p className="text-gray-500 text-xs mt-1">Start by running an AI agent</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {tasks.map((task: Task, index: number) => (
-            <div key={task.id} className="relative">
+          {recentActivity.map((activity, index) => (
+            <div key={activity.id} className="relative">
               {/* Timeline line */}
-              {index < tasks.length - 1 && (
+              {index < recentActivity.length - 1 && (
                 <div className="absolute left-6 top-8 w-0.5 h-8 bg-[#333]"></div>
               )}
               
               <div className="flex items-start space-x-3">
                 {/* Status indicator */}
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getStatusColor(task.status)}`}>
-                  {getStatusIcon(task.status)}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getStatusColor(activity.status)}`}>
+                  {getTypeIcon(activity.type)}
                 </div>
                 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                      {task.status.replace('_', ' ')}
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.status)}`}>
+                      {activity.status.replace('_', ' ')}
                     </span>
-                    <span className="text-xs text-gray-400">{formatTimeAgo(task.created_at)}</span>
+                    <span className="text-xs text-gray-400">{formatTimeAgo(activity.created_at)}</span>
                   </div>
                   
                   <p className="text-sm text-white mb-1">
-                    {truncateText(task.task_prompt)}
+                    {activity.title}
                   </p>
                   
-                  {task.result && task.status === 'completed' && (
-                    <div className="text-xs text-gray-400">
-                      Result: {truncateText(task.result, 30)}
+                  <div className="text-xs text-gray-400">
+                    {truncateText(activity.description, 40)}
                     </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -174,7 +148,7 @@ export default function RecentActivity({ userId, limit = 5 }: RecentActivityProp
         </div>
       )}
       
-      {tasks.length > 0 && (
+      {recentActivity.length > 0 && (
         <div className="mt-4 pt-4 border-t border-[#333]">
           <button className="w-full text-center text-sm text-[#6366f1] hover:text-[#8b5cf6] transition-colors" onClick={() => router.push('/dashboard/activity')}>
             View all activity

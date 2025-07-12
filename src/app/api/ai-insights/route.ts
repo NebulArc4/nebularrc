@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
-import { aiService } from '@/lib/ai-service'
+import { groq } from '@ai-sdk/groq'
+import { streamText } from 'ai'
 
 export async function POST() {
   try {
@@ -39,13 +40,74 @@ export async function POST() {
       taskCategories: [...new Set(tasks?.map(t => t.category).filter(Boolean) || [])]
     }
 
-    // Generate AI insights
-    const insights = await aiService.generateInsights({
-      userId: user.id,
-      userData
+    // Calculate completion rate
+    const completionRate = userData.totalTasks > 0 ? (userData.completedTasks / userData.totalTasks * 100).toFixed(1) : 0
+
+    // Create AI prompt for insights
+    const prompt = `Analyze this user data and provide structured insights:
+
+📊 USER METRICS
+- Total Tasks: ${userData.totalTasks}
+- Completed Tasks: ${userData.completedTasks}
+- Completion Rate: ${completionRate}%
+- Active Agents: ${userData.activeAgents}
+- Task Categories: ${userData.taskCategories.join(', ') || 'None'}
+- Recent Activity: ${userData.recentActivity.length} recent tasks
+
+Provide insights in this CLEAN, STRUCTURED format:
+
+🎯 KEY INSIGHTS
+Insight 1: [Title]
+- Analysis: [Detailed explanation]
+- Impact: [High/Medium/Low]
+- Confidence: [X%]
+
+Insight 2: [Title]
+- Analysis: [Detailed explanation]
+- Impact: [High/Medium/Low]
+- Confidence: [X%]
+
+Insight 3: [Title]
+- Analysis: [Detailed explanation]
+- Impact: [High/Medium/Low]
+- Confidence: [X%]
+
+📈 OPTIMIZATION OPPORTUNITIES
+Opportunity 1: [Specific optimization]
+- Potential Improvement: [X%]
+- Effort Required: [Low/Medium/High]
+- Timeline: [Immediate/Short-term/Long-term]
+
+Opportunity 2: [Specific optimization]
+- Potential Improvement: [X%]
+- Effort Required: [Low/Medium/High]
+- Timeline: [Immediate/Short-term/Long-term]
+
+✅ ACTIONABLE RECOMMENDATIONS
+1. [Specific, actionable recommendation]
+2. [Specific, actionable recommendation]
+3. [Specific, actionable recommendation]
+
+Focus on productivity improvements, efficiency gains, and optimization opportunities.`
+
+    // Generate insights using Vercel AI SDK with Groq
+    const result = await streamText({
+      model: groq('llama3-8b-8192'),
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an AI productivity analyst. Provide clear, structured, and actionable insights based on user data. Always include specific metrics and confidence levels.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      maxTokens: 1200,
     })
 
-    return NextResponse.json(insights)
+    return result.toDataStreamResponse()
   } catch (error) {
     console.error('Error generating AI insights:', error)
     return NextResponse.json(

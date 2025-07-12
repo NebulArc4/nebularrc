@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Agent, AgentRun } from '@/lib/agent-service'
-import StockPriceChart, { searchSymbolByCompanyName } from '@/components/StockPriceChart'
 import useSWR from 'swr'
 import toast from 'react-hot-toast'
-import AIOutputRenderer from './AIOutputRenderer'
 
 export default function AgentManager() {
-  const { data: agents = [], error, isLoading, mutate } = useSWR('/api/agents')
+  const { data: agents = [], isLoading, mutate } = useSWR('/api/agents')
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
@@ -19,19 +17,15 @@ export default function AgentManager() {
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'last_run' | 'complexity'>('name')
 
   useEffect(() => {
-    if (error) toast.error('Error fetching agents')
-  }, [error])
-
-  useEffect(() => {
     let filtered = agents
 
     // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter((agent: Agent) =>
-        agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        agent.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        agent.task_prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        agent.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (agent.name && typeof agent.name === 'string' && agent.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (agent.description && typeof agent.description === 'string' && agent.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (agent.task_prompt && typeof agent.task_prompt === 'string' && agent.task_prompt.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (agent.category && typeof agent.category === 'string' && agent.category.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     }
 
@@ -53,7 +47,7 @@ export default function AgentManager() {
     filtered.sort((a: Agent, b: Agent) => {
       switch (sortBy) {
         case 'name':
-          return a.name.localeCompare(b.name)
+          return (a.name || '').localeCompare(b.name || '')
         case 'status':
           return (a.is_active ? 0 : 1) - (b.is_active ? 0 : 1)
         case 'last_run':
@@ -92,7 +86,7 @@ export default function AgentManager() {
         toast.success('Agent status updated')
         return updated
       }, false)
-    } catch (error) {
+    } catch {
       toast.error('Error toggling agent')
     }
   }
@@ -116,7 +110,7 @@ export default function AgentManager() {
       } else {
         toast.error('Failed to run agent')
       }
-    } catch (error) {
+    } catch {
       toast.error('Error running agent')
     } finally {
       setRunningAgents(prev => {
@@ -137,7 +131,7 @@ export default function AgentManager() {
         ) : []
         setAgentRuns(sortedRuns)
       }
-    } catch (error) {
+    } catch {
       toast.error('Error fetching agent runs')
     }
   }
@@ -157,47 +151,13 @@ export default function AgentManager() {
     }
   }
 
-  const getRunPreview = (run: AgentRun): string => {
-    const result = run.result || ''
-    return result.length > 100 ? result.substring(0, 100) + '...' : result
-  }
-
-  // Helper hook to extract stock symbol or company name and resolve to symbol
-  function useResolvedSymbol(text: string): string | null {
-    const [resolvedSymbol, setResolvedSymbol] = useState<string | null>(null);
-    useEffect(() => {
-      // Try regex for symbol first
-      const match = text.match(/\b[A-Z]{1,5}\b/g);
-      const blacklist = ['THE', 'AND', 'FOR', 'WITH', 'FROM', 'THIS', 'THAT', 'YOUR', 'HAVE', 'WILL', 'SHOULD', 'COULD', 'MIGHT', 'ABOUT', 'WHICH', 'THERE', 'THEIR', 'WHAT', 'WHEN', 'WHERE', 'WHO', 'WHY', 'HOW'];
-      const symbol = match?.find(s => !blacklist.includes(s)) || null;
-      if (symbol) {
-        setResolvedSymbol(symbol);
-        return;
-      }
-      // If no symbol, look for company name if context is investment
-      const investmentKeywords = ['invest', 'investment', 'stock', 'buy', 'sell', 'portfolio', 'shares', 'market', 'equity', 'ipo', 'dividend'];
-      const lower = text.toLowerCase();
-      if (investmentKeywords.some(k => lower.includes(k))) {
-        // Try to find a capitalized word (company name)
-        const nameMatch = text.match(/\b([A-Z][a-z]+)\b/);
-        if (nameMatch) {
-          searchSymbolByCompanyName(nameMatch[1]).then(sym => {
-            if (sym) setResolvedSymbol(sym);
-          });
-        }
-      }
-    }, [text]);
-    return resolvedSymbol;
-  }
-
-  function AgentRunWithChart({ run, getStatusColor, getRunPreview }: { run: AgentRun, getStatusColor: (s: string) => string, getRunPreview: (r: AgentRun) => string }) {
+  function AgentRunWithChart({ run, getStatusColor }: { run: AgentRun, getStatusColor: (s: string) => string }) {
     return (
       <div className="bg-white dark:bg-[#1f1f1f] rounded-lg p-3 border border-gray-200 dark:border-[#333] mb-4">
         <div className="flex items-center justify-between mb-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(run.status)}`}>{run.status}</span>
           <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(run.started_at).toLocaleDateString()}</span>
         </div>
-        <AIOutputRenderer text={run.result || ''} />
       </div>
     );
   }
@@ -380,7 +340,7 @@ export default function AgentManager() {
                   {agentRuns.length > 0 ? (
                     <div className="space-y-3">
                       {agentRuns.slice(0, 3).map((run) => (
-                        <AgentRunWithChart key={run.id} run={run} getStatusColor={getStatusColor} getRunPreview={getRunPreview} />
+                        <AgentRunWithChart key={run.id} run={run} getStatusColor={getStatusColor} />
                       ))}
                     </div>
                   ) : (

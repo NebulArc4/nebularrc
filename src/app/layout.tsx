@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'NebulArc - AI Operating System',
-  description: 'Your personal AI operating system for task automation and intelligent workflows.',
+  description: 'Your personal AI operating system for intelligent analysis and decision support.',
 }
 
 export default function RootLayout({
