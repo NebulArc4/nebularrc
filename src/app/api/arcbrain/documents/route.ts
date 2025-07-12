@@ -60,6 +60,25 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // First, try to create the documents bucket if it doesn't exist
+    try {
+      const { data: bucketData, error: bucketError } = await supabase.storage
+        .createBucket('documents', {
+          public: false,
+          allowedMimeTypes: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/*'],
+          fileSizeLimit: 10485760 // 10MB
+        });
+      
+      if (bucketError && bucketError.message !== 'Bucket already exists') {
+        console.log('Bucket creation error (non-critical):', bucketError.message);
+      } else if (bucketData) {
+        console.log('Documents bucket created successfully');
+      }
+    } catch (bucketCreateError) {
+      console.log('Bucket creation failed (non-critical):', bucketCreateError);
+      // Continue with upload attempt
+    }
+
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from('documents')
@@ -71,6 +90,15 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Supabase upload error:', error);
+      
+      // If bucket doesn't exist, provide a helpful error message
+      if (error.message === 'Bucket not found') {
+        return NextResponse.json({ 
+          error: 'Storage bucket not configured. Please contact support to set up document storage.',
+          details: 'The documents storage bucket needs to be created in your Supabase project.'
+        }, { status: 500 });
+      }
+      
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
