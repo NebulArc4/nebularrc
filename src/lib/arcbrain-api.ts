@@ -11,15 +11,37 @@ export interface DecisionInput {
 }
 
 export interface AIAnalysis {
+  status?: string;
+  error?: string;
   reasoning_steps: string[];
-  pros_cons: {
-    pros: string[];
-    cons: string[];
+  technical_analysis?: {
+    feasibility_assessment: string[];
+    implementation_complexity: string;
+    technical_risks: string[];
+    technology_recommendations: string[];
+  };
+  strategic_insights?: {
+    market_positioning: string[];
+    competitive_analysis: string[];
+    strategic_advantages: string[];
+    long_term_implications: string[];
+  };
+  financial_analysis?: {
+    cost_benefit_breakdown: string[];
+    roi_projections: string[];
+    financial_risks: string[];
+    funding_considerations: string[];
   };
   risk_assessment: Record<string, string>;
   recommendations: string[];
-  confidence_score: number;
   estimated_impact: string;
+  next_steps?: string[];
+  success_metrics?: string[];
+  pros_cons?: {
+    pros: string[];
+    cons: string[];
+  };
+  confidence_score?: number;
 }
 
 export interface Decision {

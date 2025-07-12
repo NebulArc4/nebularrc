@@ -148,10 +148,15 @@ export default function DecisionWorkspace({
     
     setIsLoading(true);
     try {
+      console.log('Starting analysis for decision:', currentDecision.title);
+      
       // Call the API directly with the decision data
       const response = await fetch('/api/arcbrain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           query: currentDecision.title,
           expert: currentDecision.brain_type,
@@ -164,17 +169,29 @@ export default function DecisionWorkspace({
         })
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        throw new Error('Failed to analyze decision');
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
       }
       
       const analysis = await response.json();
       console.log('Analysis result:', analysis);
+      
+      if (!analysis || analysis.error) {
+        throw new Error(analysis?.error || 'Invalid analysis response');
+      }
+      
       setAnalysis(analysis);
       setStep('analysis');
       onAnalysisComplete?.(analysis);
     } catch (error) {
       console.error('Failed to analyze decision:', error);
+      // Show error to user
+      alert(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -488,107 +505,178 @@ export default function DecisionWorkspace({
                 AI Analysis Results
               </h2>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Confidence Score */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg">
-                  <h3 className="font-medium text-gray-900 mb-2">Confidence Score</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="text-3xl font-bold text-green-600">
-                      {Math.round(analysis.confidence_score * 100)}%
-                    </div>
-                    <div className="flex-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-600 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${analysis.confidence_score * 100}%` }}
-                        />
+              {/* Status and Error Display */}
+              {analysis.status && (
+                <div className={`mb-4 p-3 rounded-lg ${
+                  analysis.status === 'success' ? 'bg-green-50 text-green-800' : 
+                  analysis.status === 'error' ? 'bg-red-50 text-red-800' : 
+                  'bg-yellow-50 text-yellow-800'
+                }`}>
+                  <div className="font-medium">Status: {analysis.status}</div>
+                  {analysis.error && <div className="text-sm mt-1">{analysis.error}</div>}
+                </div>
+              )}
+
+              {/* Reasoning Steps */}
+              {analysis.reasoning_steps && analysis.reasoning_steps.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Analysis Reasoning</h3>
+                  <div className="space-y-3">
+                    {analysis.reasoning_steps.map((step, index) => (
+                      <div key={index} className="flex gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+                          {index + 1}
+                        </div>
+                        <p className="text-gray-700">{step}</p>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Technical Analysis */}
+              {analysis.technical_analysis && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Technical Analysis</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-800 mb-2">Feasibility Assessment</h4>
+                      <ul className="space-y-1">
+                        {analysis.technical_analysis.feasibility_assessment?.map((item, index) => (
+                          <li key={index} className="text-sm text-blue-700">• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-purple-800 mb-2">Implementation Complexity</h4>
+                      <p className="text-sm text-purple-700">{analysis.technical_analysis.implementation_complexity}</p>
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* Estimated Impact */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
-                  <h3 className="font-medium text-gray-900 mb-2">Estimated Impact</h3>
-                  <p className="text-lg font-medium text-purple-700">{analysis.estimated_impact}</p>
-                </div>
-              </div>
-
-              {/* Reasoning Steps */}
-              <div className="mt-6">
-                <h3 className="font-medium text-gray-900 mb-3">Analysis Reasoning</h3>
-                <div className="space-y-3">
-                  {Array.isArray(analysis.reasoning_steps) && analysis.reasoning_steps.map((step, index) => (
-                    <div key={index} className="flex gap-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
-                        {index + 1}
-                      </div>
-                      <p className="text-gray-700">{step}</p>
+              {/* Strategic Insights */}
+              {analysis.strategic_insights && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Strategic Insights</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-green-800 mb-2">Market Positioning</h4>
+                      <ul className="space-y-1">
+                        {analysis.strategic_insights.market_positioning?.map((item, index) => (
+                          <li key={index} className="text-sm text-green-700">• {item}</li>
+                        ))}
+                      </ul>
                     </div>
-                  ))}
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-orange-800 mb-2">Strategic Advantages</h4>
+                      <ul className="space-y-1">
+                        {analysis.strategic_insights.strategic_advantages?.map((item, index) => (
+                          <li key={index} className="text-sm text-orange-700">• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Pros and Cons */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h3 className="font-medium text-green-800 mb-3 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Pros
-                  </h3>
-                  <ul className="space-y-2">
-                    {(Array.isArray(analysis.pros_cons?.pros) ? analysis.pros_cons.pros : []).map((pro, index) => (
-                      <li key={index} className="flex gap-2">
-                        <span className="text-green-600">•</span>
-                        <span className="text-green-700">{pro}</span>
-                      </li>
-                    ))}
-                  </ul>
+              {/* Financial Analysis */}
+              {analysis.financial_analysis && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Financial Analysis</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-emerald-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-emerald-800 mb-2">Cost-Benefit Breakdown</h4>
+                      <ul className="space-y-1">
+                        {analysis.financial_analysis.cost_benefit_breakdown?.map((item, index) => (
+                          <li key={index} className="text-sm text-emerald-700">• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-teal-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-teal-800 mb-2">ROI Projections</h4>
+                      <ul className="space-y-1">
+                        {analysis.financial_analysis.roi_projections?.map((item, index) => (
+                          <li key={index} className="text-sm text-teal-700">• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <h3 className="font-medium text-red-800 mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Cons
-                  </h3>
-                  <ul className="space-y-2">
-                    {(Array.isArray(analysis.pros_cons?.cons) ? analysis.pros_cons.cons : []).map((con, index) => (
-                      <li key={index} className="flex gap-2">
-                        <span className="text-red-600">•</span>
-                        <span className="text-red-700">{con}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              )}
 
               {/* Risk Assessment */}
-              <div className="mt-6">
-                <h3 className="font-medium text-gray-900 mb-3">Risk Assessment</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {Object.entries(analysis.risk_assessment || {}).map(([risk, level]) => (
-                    <div key={risk} className="bg-gray-50 p-3 rounded-lg">
-                      <div className="text-sm text-gray-500 capitalize">{risk.replace('_', ' ')}</div>
-                      <div className="font-medium text-gray-900">{level}</div>
-                    </div>
-                  ))}
+              {analysis.risk_assessment && Object.keys(analysis.risk_assessment).length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Risk Assessment</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(analysis.risk_assessment).map(([risk, level]) => (
+                      <div key={risk} className="bg-gray-50 p-3 rounded-lg">
+                        <div className="text-sm text-gray-500 capitalize">{risk.replace('_', ' ')}</div>
+                        <div className="font-medium text-gray-900">{level}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Recommendations */}
-              <div className="mt-6">
-                <h3 className="font-medium text-gray-900 mb-3">Recommendations</h3>
-                <div className="space-y-3">
-                  {Array.isArray(analysis.recommendations) && analysis.recommendations.map((recommendation, index) => (
-                    <div key={index} className="flex gap-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
-                        {index + 1}
+              {analysis.recommendations && analysis.recommendations.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Recommendations</h3>
+                  <div className="space-y-3">
+                    {analysis.recommendations.map((recommendation, index) => (
+                      <div key={index} className="flex gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+                          {index + 1}
+                        </div>
+                        <p className="text-gray-700">{recommendation}</p>
                       </div>
-                      <p className="text-gray-700">{recommendation}</p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Estimated Impact */}
+              {analysis.estimated_impact && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Estimated Impact</h3>
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
+                    <p className="text-lg font-medium text-purple-700">{analysis.estimated_impact}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Next Steps */}
+              {analysis.next_steps && analysis.next_steps.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Next Steps</h3>
+                  <div className="space-y-2">
+                    {analysis.next_steps.map((step, index) => (
+                      <div key={index} className="flex gap-3">
+                        <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+                          {index + 1}
+                        </div>
+                        <p className="text-gray-700">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Success Metrics */}
+              {analysis.success_metrics && analysis.success_metrics.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3">Success Metrics</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {analysis.success_metrics.map((metric, index) => (
+                      <div key={index} className="bg-indigo-50 p-3 rounded-lg">
+                        <p className="text-sm text-indigo-700">{metric}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-4">
