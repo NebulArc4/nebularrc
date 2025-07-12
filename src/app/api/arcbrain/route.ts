@@ -553,21 +553,41 @@ Use both Chain of Thought and Tree of Thoughts reasoning to enhance your analysi
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const path = searchParams.get('path');
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+  
   // Always return arrays for list endpoints
   if (path === 'decisions') {
-    return Response.json([]); // Always an array
+    return Response.json([], { headers }); // Always an array
   }
   if (path === 'templates') {
-    return Response.json([]); // Always an array
+    return Response.json([], { headers }); // Always an array
   }
   if (path === 'analytics/overview') {
-    return Response.json({ summary: 'No analytics available (no DB).' });
+    return Response.json({ summary: 'No analytics available (no DB).' }, { headers });
   }
-  return Response.json({ message: 'OK (no DB)' });
+  return Response.json({ 
+    message: 'ArcBrain API is working',
+    timestamp: new Date().toISOString(),
+    status: 'healthy'
+  }, { headers });
 }
 
 export async function POST(req: NextRequest) {
   console.log('[ArcBrain API] POST request received');
+  
+  // Add CORS headers
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
   
   function getDefaultAnalysis(status: string, errorMsg?: string): any {
     return {
@@ -608,7 +628,10 @@ export async function POST(req: NextRequest) {
     // Check if required environment variables are set
     if (!process.env.GROQ_API_KEY) {
       console.error('[ArcBrain API] GROQ_API_KEY not found');
-      return NextResponse.json(getDefaultAnalysis('error', 'AI service not configured'), { status: 500 });
+      return NextResponse.json(getDefaultAnalysis('error', 'AI service not configured'), { 
+        status: 500,
+        headers 
+      });
     }
     
     // Extract decision data from request
@@ -675,12 +698,15 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[ArcBrain API] Returning analysis with status:', aiAnalysis.status, '| Title:', decision.title);
-    return NextResponse.json(aiAnalysis);
+    return NextResponse.json(aiAnalysis, { headers });
   } catch (error) {
     console.error('[ArcBrain API] Error:', error);
     const fallback = getDefaultAnalysis('error', 'Failed to analyze decision');
     console.log('[ArcBrain API] Returning fallback analysis with status: error');
-    return NextResponse.json(fallback, { status: 500 });
+    return NextResponse.json(fallback, { 
+      status: 500,
+      headers 
+    });
   }
 }
 
