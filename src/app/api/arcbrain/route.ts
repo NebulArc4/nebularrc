@@ -567,6 +567,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: NextRequest) {
+  console.log('[ArcBrain API] POST request received');
+  
   function getDefaultAnalysis(status: string, errorMsg?: string): any {
     return {
       status,
@@ -599,7 +601,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    console.log('[ArcBrain API] Parsing request body...');
     const body = await req.json();
+    console.log('[ArcBrain API] Request body:', JSON.stringify(body, null, 2));
+    
+    // Check if required environment variables are set
+    if (!process.env.GROQ_API_KEY) {
+      console.error('[ArcBrain API] GROQ_API_KEY not found');
+      return NextResponse.json(getDefaultAnalysis('error', 'AI service not configured'), { status: 500 });
+    }
+    
     // Extract decision data from request
     const decision: Decision = {
       id: generateUUID(),
@@ -624,37 +635,49 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
+    console.log('[ArcBrain API] Decision object created:', decision.title);
+
     // Generate AI analysis with memory and reasoning
+    console.log('[ArcBrain API] Starting AI analysis...');
     const analysisText = await getReasoningEnhancedAnalysis(decision);
+    console.log('[ArcBrain API] AI analysis completed, parsing response...');
+    
     let aiAnalysis: AIAnalysis | any;
     let status = 'success';
     try {
       aiAnalysis = JSON.parse(analysisText);
       aiAnalysis.status = 'success';
+      console.log('[ArcBrain API] Analysis parsed successfully');
     } catch (parseError) {
       status = 'fallback';
-      console.error('Failed to parse AI analysis:', parseError);
-      console.error('Raw AI output:', analysisText);
+      console.error('[ArcBrain API] Failed to parse AI analysis:', parseError);
+      console.error('[ArcBrain API] Raw AI output:', analysisText);
       aiAnalysis = getDefaultAnalysis('fallback', 'Failed to parse AI output');
     }
 
     // Store decision in memory for learning
-    const decisionMemory: DecisionMemory = {
-      id: generateUUID(),
-      decision_id: decision.id,
-      brain_type: decision.brain_type,
-      predicted_impact: aiAnalysis.estimated_impact,
-      predicted_recommendations: aiAnalysis.recommendations,
-      predicted_risks: aiAnalysis.risk_assessment,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    await aiMemory.addDecision(decisionMemory);
+    try {
+      const decisionMemory: DecisionMemory = {
+        id: generateUUID(),
+        decision_id: decision.id,
+        brain_type: decision.brain_type,
+        predicted_impact: aiAnalysis.estimated_impact,
+        predicted_recommendations: aiAnalysis.recommendations,
+        predicted_risks: aiAnalysis.risk_assessment,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await aiMemory.addDecision(decisionMemory);
+      console.log('[ArcBrain API] Decision stored in memory');
+    } catch (memoryError) {
+      console.error('[ArcBrain API] Failed to store decision in memory:', memoryError);
+      // Continue without memory storage
+    }
 
     console.log('[ArcBrain API] Returning analysis with status:', aiAnalysis.status, '| Title:', decision.title);
     return NextResponse.json(aiAnalysis);
   } catch (error) {
-    console.error('ArcBrain API Error:', error);
+    console.error('[ArcBrain API] Error:', error);
     const fallback = getDefaultAnalysis('error', 'Failed to analyze decision');
     console.log('[ArcBrain API] Returning fallback analysis with status: error');
     return NextResponse.json(fallback, { status: 500 });
