@@ -5,17 +5,38 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Test endpoint to verify the route is working
+export async function GET() {
+  return NextResponse.json({ 
+    status: 'API route is working',
+    timestamp: new Date().toISOString(),
+    supabaseUrl: supabaseUrl ? 'Configured' : 'Missing',
+    supabaseKey: supabaseKey ? 'Configured' : 'Missing'
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
+    console.log('POST request received to /api/arcbrain/documents');
+    
     // Check if the request has the correct content type
     const contentType = req.headers.get('content-type');
+    console.log('Content-Type:', contentType);
+    
     if (!contentType || !contentType.includes('multipart/form-data')) {
+      console.log('Invalid content type:', contentType);
       return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
     }
 
     // Parse form data
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    
+    console.log('File received:', file ? {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    } : 'No file');
     
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
@@ -32,6 +53,8 @@ export async function POST(req: NextRequest) {
     const originalName = file.name || 'document';
     const extension = originalName.includes('.') ? originalName.split('.').pop() : '';
     const fileName = `${timestamp}-${originalName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+    console.log('Uploading file:', fileName);
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
@@ -50,6 +73,8 @@ export async function POST(req: NextRequest) {
       console.error('Supabase upload error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    console.log('Upload successful:', data);
 
     return NextResponse.json({ 
       id: data?.path || fileName, 
