@@ -22,6 +22,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { arcbrainAPI, type CreateDecisionRequest, type Decision, type AIAnalysis } from '@/lib/arcbrain-api';
+import { saveArcBrainAnalysis } from '@/lib/supabase-browser';
+import { supabase } from '@/lib/supabase-browser';
+import { useRouter } from "next/navigation";
+import { v4 as uuidv4 } from 'uuid';
 
 interface DecisionWorkspaceProps {
   brainType: 'finance' | 'strategy' | 'personal';
@@ -79,6 +83,9 @@ export default function DecisionWorkspace({
 
   const config = brainTypeConfig[brainType];
   const IconComponent = config.icon;
+
+  const router = useRouter();
+  const userId = "user-123"; // TODO: Replace with real user ID from auth context
 
   const handleInputChange = (field: keyof CreateDecisionRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -188,6 +195,23 @@ export default function DecisionWorkspace({
       setAnalysis(analysis);
       setStep('analysis');
       onAnalysisComplete?.(analysis);
+      // Save to ai_memories and navigate to result page
+      const aiMemoryRow = {
+        id: uuidv4(),
+        decision_id: uuidv4(), // or use a real decision id if available
+        brain_type: currentDecision.brain_type,
+        predicted_impact: analysis.estimated_impact,
+        predicted_recommendations: analysis.recommendations,
+        predicted_risks: analysis.risk_assessment,
+        actual_outcome: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('ai_memories').insert([aiMemoryRow]);
+      if (error) {
+        throw new Error('Failed to save analysis to ai_memories: ' + error.message);
+      }
+      router.push('/dashboard/arc-brain/result');
     } catch (error) {
       console.error('Failed to analyze decision:', error);
       // Show error to user
