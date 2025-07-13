@@ -69,17 +69,17 @@ export default function ArcBrainPage() {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Fetch uploaded documents for the user
+  const fetchDocuments = async () => {
+    // TODO: Replace with real user ID from auth context
+    const userId = 'user-123';
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, file_name, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (!error && data) setDocuments(data);
+  };
   useEffect(() => {
-    async function fetchDocuments() {
-      // TODO: Replace with real user ID from auth context
-      const userId = 'user-123';
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, file_name, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      if (!error && data) setDocuments(data);
-    }
     fetchDocuments();
   }, []);
 
@@ -108,6 +108,7 @@ export default function ArcBrainPage() {
     }));
   };
 
+  // After upload, refresh documents list
   const uploadFile = async (file: File, idx: number) => {
     setUploadedFiles(prev => prev.map((f, i) => i === idx ? { ...f, status: 'uploading' as const, progress: 0 } : f));
     const formData = new FormData();
@@ -126,6 +127,8 @@ export default function ArcBrainPage() {
         if (xhr.status === 200) {
           const res = JSON.parse(xhr.responseText);
           setUploadedFiles(prev => prev.map((f, i) => i === idx ? { ...f, status: 'uploaded' as const, serverId: res.id, progress: 100 } : f));
+          // Refresh documents list after upload
+          fetchDocuments();
         } else {
           setUploadedFiles(prev => prev.map((f, i) => i === idx ? { ...f, status: 'error' as const, error: xhr.statusText } : f));
         }

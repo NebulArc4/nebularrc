@@ -102,10 +102,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Insert document metadata into the documents table
+    const userId = 'user-123'; // TODO: Replace with real user ID from auth
+    const { data: docInsert, error: docInsertError } = await supabase
+      .from('documents')
+      .insert([
+        {
+          user_id: userId,
+          file_name: originalName,
+          storage_path: data?.path || fileName,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select('id');
+
+    if (docInsertError) {
+      console.error('Error inserting document metadata:', docInsertError);
+      return NextResponse.json({ error: 'Failed to save document metadata', details: docInsertError.message }, { status: 500 });
+    }
+
     console.log('Upload successful:', data);
 
     return NextResponse.json({ 
-      id: data?.path || fileName, 
+      id: docInsert?.[0]?.id,
       name: fileName,
       size: file.size,
       type: file.type,
