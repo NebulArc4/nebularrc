@@ -14,6 +14,12 @@ import {
 } from 'lucide-react';
 import AIMemoryStats from '@/components/AIMemoryStats';
 import { useRef } from 'react';
+import { useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface DecisionForm {
   title: string;
@@ -59,6 +65,23 @@ export default function ArcBrainPage() {
   const [error, setError] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<{file: File, status: 'pending' | 'uploading' | 'uploaded' | 'error', progress: number, serverId?: string, error?: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+
+  // Fetch uploaded documents for the user
+  useEffect(() => {
+    async function fetchDocuments() {
+      // TODO: Replace with real user ID from auth context
+      const userId = 'user-123';
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, file_name, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (!error && data) setDocuments(data);
+    }
+    fetchDocuments();
+  }, []);
 
   const handleInputChange = (field: keyof DecisionForm, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -143,6 +166,10 @@ export default function ArcBrainPage() {
     e.stopPropagation();
   };
 
+  const handleDocCheckbox = (id: string) => {
+    setSelectedDocIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  };
+
   const handleAnalyze = async () => {
     if (!form.title || !form.problemStatement) return;
     setIsAnalyzing(true);
@@ -163,13 +190,13 @@ export default function ArcBrainPage() {
           budget_range: form.budget,
           expert: form.category,
           priority: form.priority,
+          document_ids: selectedDocIds,
         }),
       });
       if (!response.ok) {
         throw new Error('Failed to analyze decision');
       }
       const result = await response.json();
-      // Store only the AIAnalysis object in localStorage for the results page
       localStorage.setItem('arcBrainAnalysis', JSON.stringify(result));
       window.location.href = '/dashboard/arc-brain/result';
     } catch (err) {
@@ -248,38 +275,45 @@ export default function ArcBrainPage() {
                   type="file"
                   multiple
                   ref={fileInputRef}
-                  className="hidden"
+                  style={{ display: 'none' }}
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.txt,.csv"
                 />
-                <div className="flex flex-col items-center">
-                  <Plus className="w-8 h-8 text-blue-400 mb-2" />
-                  <span className="text-gray-300">Drag & drop files here, or <span className="underline text-blue-400">click to browse</span></span>
-                  <span className="text-xs text-gray-500 mt-1">PDF, DOCX, TXT, CSV supported</span>
-                </div>
+                <span className="text-blue-300">Drag & drop or click to upload documents (PDF, DOCX, TXT, CSV)</span>
               </div>
-              {uploadedFiles.length > 0 && (
-                <ul className="mt-4 space-y-2 w-full max-w-lg mx-auto">
-                  {uploadedFiles.map((f, idx) => (
-                    <li key={idx} className="flex items-center justify-between bg-gray-700 rounded px-3 py-2 text-gray-200">
-                      <div className="flex flex-col flex-1">
-                        <span className="truncate max-w-xs">{f.file.name}</span>
-                        <div className="h-2 w-full bg-gray-600 rounded mt-1">
-                          <div className={`h-2 rounded ${f.status === 'error' ? 'bg-red-500' : f.status === 'uploaded' ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${f.progress}%` }} />
-                        </div>
-                        {f.status === 'error' && <span className="text-xs text-red-400">{f.error}</span>}
-                      </div>
-                      <button
-                        className="ml-4 text-red-400 hover:text-red-600"
-                        onClick={() => handleRemoveFile(idx)}
-                        type="button"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {/* Uploaded files list */}
+              <div className="mt-2 space-y-2">
+                {uploadedFiles.map((f, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm text-gray-200">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span>{f.file.name}</span>
+                    {f.status === 'uploading' && <span className="text-blue-400">Uploading... {f.progress}%</span>}
+                    {f.status === 'uploaded' && <span className="text-green-400">Uploaded</span>}
+                    {f.status === 'error' && <span className="text-red-400">Error: {f.error}</span>}
+                    <button onClick={() => handleRemoveFile(idx)} className="ml-2 text-red-400 hover:text-red-600"><XCircle className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Select Documents for Analysis */}
+            <div className="mb-4">
+              <label className="block text-white font-semibold mb-2">Select Documents to Use in Analysis</label>
+              <div className="bg-gray-800 rounded-lg p-4 max-h-48 overflow-y-auto">
+                {documents.length === 0 ? (
+                  <div className="text-gray-400 text-sm">No documents uploaded yet.</div>
+                ) : (
+                  documents.map(doc => (
+                    <label key={doc.id} className="flex items-center gap-2 text-gray-200 cursor-pointer mb-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocIds.includes(doc.id)}
+                        onChange={() => handleDocCheckbox(doc.id)}
+                        className="accent-blue-500"
+                      />
+                      <span>{doc.file_name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
             {/* AI-Powered Analysis Card */}
             <div className="max-w-xl mx-auto mb-4">

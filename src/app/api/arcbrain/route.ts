@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { aiMemory, DecisionMemory } from '@/lib/ai-memory';
 import { aiReasoning } from '@/lib/ai-reasoning';
 import { buildRAGPrompt, getGroqAnswer } from '@/lib/groq-rag';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Types
 interface DecisionInput {
@@ -339,7 +344,7 @@ CRITICAL: Respond with ONLY valid JSON in the exact format specified above. Do n
 }
 
 // Add reasoning-enhanced analysis function
-async function getReasoningEnhancedAnalysis(decision: Decision): Promise<string> {
+async function getReasoningEnhancedAnalysis(decision: Decision, extraPrompt: string = ''): Promise<string> {
   let systemPrompt = 'You are an expert AI decision analyst with access to historical decision data and advanced reasoning methods. You MUST respond with ONLY valid JSON. No text before or after the JSON.';
   let analysisPrompt = '';
   
@@ -533,21 +538,8 @@ CRITICAL: Respond with ONLY valid JSON in the exact format specified above. Do n
     aiReasoning.generateTreeOfThoughts(decision.title, decision.brain_type, reasoningContext)
   ]);
 
-  // Combine reasoning with enhanced prompt
-  const reasoningEnhancedPrompt = `${enhancedPrompt}
-
-ADVANCED REASONING CONTEXT:
-
-Chain of Thought Analysis (${cotResult.confidence}% confidence):
-${cotResult.steps.join('\n')}
-Final Reasoning: ${cotResult.final_reasoning}
-
-Tree of Thoughts Analysis (${totResult.confidence}% confidence):
-Root Thought: ${totResult.root_thought}
-Best Path: ${totResult.best_path.join(' → ')}
-Final Decision: ${totResult.final_decision}
-
-Use both Chain of Thought and Tree of Thoughts reasoning to enhance your analysis.`;
+  // Combine reasoning with enhanced prompt and document text
+  const reasoningEnhancedPrompt = `${enhancedPrompt}${extraPrompt}\n\nADVANCED REASONING CONTEXT:\n\nChain of Thought Analysis (${cotResult.confidence}% confidence):\n${cotResult.steps.join('\n')}\nFinal Reasoning: ${cotResult.final_reasoning}\n\nTree of Thoughts Analysis (${totResult.confidence}% confidence):\nRoot Thought: ${totResult.root_thought}\nBest Path: ${totResult.best_path.join(' → ')}\nFinal Decision: ${totResult.final_decision}\n\nUse both Chain of Thought and Tree of Thoughts reasoning to enhance your analysis.`;
 
   // Use direct fetch to Groq API with reasoning-enhanced prompt
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -663,6 +655,26 @@ export async function POST(req: NextRequest) {
       });
     }
     
+    // NEW: Accept document_ids from frontend
+    const documentIds: string[] = body.document_ids || [];
+    let documentTextSection = '';
+    if (documentIds.length > 0) {
+      // Fetch extracted_text for each document
+      const { data: docs, error } = await supabase
+        .from('documents')
+        .select('id, file_name, extracted_text')
+        .in('id', documentIds);
+      if (error) {
+        console.error('[ArcBrain API] Error fetching documents:', error);
+      } else if (docs && docs.length > 0) {
+        documentTextSection = '\n\nRELEVANT DOCUMENT CONTENT:\n';
+        docs.forEach((doc: any, idx: number) => {
+          documentTextSection += `--- Document ${idx + 1}: ${doc.file_name} ---\n`;
+          documentTextSection += (doc.extracted_text || '[No text extracted]') + '\n';
+        });
+      }
+    }
+
     // Extract decision data from request
     const decision: Decision = {
       id: generateUUID(),
@@ -689,9 +701,10 @@ export async function POST(req: NextRequest) {
 
     console.log('[ArcBrain API] Decision object created:', decision.title);
 
-    // Generate AI analysis with memory and reasoning
-    console.log('[ArcBrain API] Starting AI analysis...');
-    const analysisText = await getReasoningEnhancedAnalysis(decision);
+    // --- ENHANCE PROMPT WITH DOCUMENT TEXT ---
+    // Use the same prompt logic as before, but append documentTextSection to the prompt
+    // We'll patch getReasoningEnhancedAnalysis to accept an extraPrompt param
+    const analysisText = await getReasoningEnhancedAnalysis(decision, documentTextSection);
     console.log('[ArcBrain API] AI analysis completed, parsing response...');
     
     let aiAnalysis: AIAnalysis | any;
