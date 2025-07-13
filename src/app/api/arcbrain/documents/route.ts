@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert document metadata into the documents table
-    const userId = 'user-123'; // TODO: Replace with real user ID from auth
+    const userId = '00000000-0000-0000-0000-000000000000'; // TODO: Replace with real user ID from auth
     const { data: docInsert, error: docInsertError } = await supabase
       .from('documents')
       .insert([
