@@ -16,6 +16,7 @@ import AIMemoryStats from '@/components/AIMemoryStats';
 import { useRef } from 'react';
 import { useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '@/components/AuthProvider';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -49,6 +50,7 @@ const priorities = [
 ];
 
 export default function ArcBrainPage() {
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<'analyze' | 'memory'>('analyze');
   const [form, setForm] = useState<DecisionForm>({
     title: '',
@@ -70,8 +72,8 @@ export default function ArcBrainPage() {
 
   // Fetch uploaded documents for the user
   const fetchDocuments = async () => {
-    // TODO: Replace with real user ID from auth context
-    const userId = 'user-123';
+    if (!user) return;
+    const userId = user.id;
     const { data, error } = await supabase
       .from('documents')
       .select('id, file_name, created_at')
@@ -80,8 +82,8 @@ export default function ArcBrainPage() {
     if (!error && data) setDocuments(data);
   };
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (!loading && user) fetchDocuments();
+  }, [user, loading]);
 
   const handleInputChange = (field: keyof DecisionForm, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -117,6 +119,7 @@ export default function ArcBrainPage() {
     try {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/arcbrain/documents');
+      if (user) xhr.setRequestHeader('x-user-id', user.id);
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 100);
@@ -127,7 +130,6 @@ export default function ArcBrainPage() {
         if (xhr.status === 200) {
           const res = JSON.parse(xhr.responseText);
           setUploadedFiles(prev => prev.map((f, i) => i === idx ? { ...f, status: 'uploaded' as const, serverId: res.id, progress: 100 } : f));
-          // Refresh documents list after upload
           fetchDocuments();
         } else {
           setUploadedFiles(prev => prev.map((f, i) => i === idx ? { ...f, status: 'error' as const, error: xhr.statusText } : f));

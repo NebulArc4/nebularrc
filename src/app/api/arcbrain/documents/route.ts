@@ -103,7 +103,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert document metadata into the documents table
-    const userId = '00000000-0000-0000-0000-000000000000'; // TODO: Replace with real user ID from auth
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing user ID in request headers' }, { status: 400 });
+    }
     const { data: docInsert, error: docInsertError } = await supabase
       .from('documents')
       .insert([
