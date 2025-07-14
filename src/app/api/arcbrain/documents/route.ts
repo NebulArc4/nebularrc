@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import pdfParse from 'pdf-parse';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -102,6 +103,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Extract text if PDF
+    let extractedText = '';
+    let extractedNumbers: string[] = [];
+    if (file.type === 'application/pdf') {
+      try {
+        const pdfData = await pdfParse(buffer);
+        extractedText = pdfData.text;
+        // Simple number extraction (e.g., 1,234.56, $1,000, 2023)
+        const numberRegex = /\$?\d{1,3}(,\d{3})*(\.\d+)?|\d+\.\d+|\d+/g;
+        extractedNumbers = Array.from(new Set((extractedText.match(numberRegex) || [])));
+      } catch (err) {
+        console.error('PDF parse error:', err);
+      }
+    }
     // Insert document metadata into the documents table
     const userId = req.headers.get('x-user-id');
     if (!userId) {
@@ -115,6 +130,8 @@ export async function POST(req: NextRequest) {
           file_name: originalName,
           storage_path: data?.path || fileName,
           created_at: new Date().toISOString(),
+          extracted_text: extractedText,
+          extracted_numbers: extractedNumbers,
         },
       ])
       .select('id');
