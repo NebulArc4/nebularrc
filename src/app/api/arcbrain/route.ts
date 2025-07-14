@@ -710,16 +710,18 @@ export async function POST(req: NextRequest) {
     console.log('[ArcBrain API] AI analysis completed, parsing response...');
     
     let aiAnalysis: AIAnalysis | any;
-    let status = 'success';
     try {
       aiAnalysis = JSON.parse(analysisText);
       aiAnalysis.status = 'success';
       console.log('[ArcBrain API] Analysis parsed successfully');
     } catch (parseError) {
-      status = 'fallback';
       console.error('[ArcBrain API] Failed to parse AI analysis:', parseError);
       console.error('[ArcBrain API] Raw AI output:', analysisText);
-      aiAnalysis = getDefaultAnalysis('fallback', 'Failed to parse AI output');
+      return NextResponse.json({
+        status: 'error',
+        error: 'AI response was not valid JSON. Please check the prompt, model, or document content.',
+        raw_output: analysisText
+      }, { status: 500, headers });
     }
 
     // Store decision in memory for learning
