@@ -162,6 +162,8 @@ async function getMemoryEnhancedAnalysis(decision: Decision): Promise<string> {
 }
 - risk_assessment: object where each key is a risk name and value is an object with { description, confidence (0-100), rationale, severity (Low/Medium/High) }
 - recommendations: array of objects with { recommendation, confidence (0-100), rationale, kpis (array), tags (array, optional) }
+- do: array of strings with clear, actionable decisions or steps to take ("Do" section)
+- dont: array of strings with clear actions or mistakes to avoid ("Don't" section)
 - estimated_impact: string describing the concrete strategic impact
 - next_steps: array of strings with specific actions to take
 - success_metrics: array of strings with measurable success indicators
@@ -171,7 +173,7 @@ async function getMemoryEnhancedAnalysis(decision: Decision): Promise<string> {
 Strategic Decision Context:
 ${JSON.stringify(decision.decision_input, null, 2)}
 
-IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language.`;
+IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language. Include explicit 'Do' and 'Don't' sections in your response.`;
   } else if (decision.brain_type === 'finance') {
     systemPrompt = 'You are a senior financial analyst with 15+ years of experience in investment management, risk assessment, and financial planning. You have worked with institutional investors, hedge funds, and Fortune 500 companies. Always respond with valid JSON only.';
     analysisPrompt = `As a senior financial analyst, provide a clear, actionable financial analysis for the following decision. Focus on RESULTS and IMPACTS, not analysis methodology. Provide a structured JSON response with the following fields:
@@ -373,6 +375,8 @@ async function getReasoningEnhancedAnalysis(decision: Decision, extraPrompt: str
 }
 - risk_assessment: object where each key is a risk name and value is an object with { description, confidence (0-100), rationale, severity (Low/Medium/High) }
 - recommendations: array of objects with { recommendation, confidence (0-100), rationale, kpis (array), tags (array, optional) }
+- do: array of strings with clear, actionable decisions or steps to take ("Do" section)
+- dont: array of strings with clear actions or mistakes to avoid ("Don't" section)
 - estimated_impact: string describing the concrete strategic impact
 - next_steps: array of strings with specific actions to take
 - success_metrics: array of strings with measurable success indicators
@@ -380,7 +384,7 @@ async function getReasoningEnhancedAnalysis(decision: Decision, extraPrompt: str
 Strategic Decision Context:
 ${JSON.stringify(decision.decision_input, null, 2)}
 
-IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language.`;
+IMPORTANT: Focus on delivering CLEAR RESULTS and ACTIONABLE INSIGHTS. Avoid analysis methodology - provide concrete findings, specific recommendations, and measurable impacts. Use clear, business-friendly language. Include explicit 'Do' and 'Don't' sections in your response.`;
   } else if (decision.brain_type === 'finance') {
     systemPrompt = 'You are a senior financial analyst with 15+ years of experience in investment management, risk assessment, and financial planning. You have worked with institutional investors, hedge funds, and Fortune 500 companies. Always respond with valid JSON only.';
     analysisPrompt = `As a senior financial analyst, provide a clear, actionable financial analysis for the following decision. Focus on RESULTS and IMPACTS, not analysis methodology. Provide a structured JSON response with the following fields:
