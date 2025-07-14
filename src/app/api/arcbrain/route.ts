@@ -659,19 +659,21 @@ export async function POST(req: NextRequest) {
     const documentIds: string[] = body.document_ids || [];
     let documentTextSection = '';
     if (documentIds.length > 0) {
-      // Fetch extracted_text for each document
+      // Fetch extracted_text and extracted_numbers for each document
       const { data: docs, error } = await supabase
         .from('documents')
-        .select('id, file_name, extracted_text')
+        .select('id, file_name, extracted_text, extracted_numbers')
         .in('id', documentIds);
       if (error) {
         console.error('[ArcBrain API] Error fetching documents:', error);
       } else if (docs && docs.length > 0) {
-        documentTextSection = '\n\nRELEVANT DOCUMENT CONTENT:\n';
+        documentTextSection = '\n\nRELEVANT DOCUMENT DATA FOR ANALYSIS:\n';
         docs.forEach((doc: any, idx: number) => {
           documentTextSection += `--- Document ${idx + 1}: ${doc.file_name} ---\n`;
-          documentTextSection += (doc.extracted_text || '[No text extracted]') + '\n';
+          documentTextSection += `Extracted Numbers: ${JSON.stringify(doc.extracted_numbers)}\n`;
+          documentTextSection += `Extracted Text: ${(doc.extracted_text || '[No text extracted]').slice(0, 2000)}\n`;
         });
+        documentTextSection += '\nINSTRUCTIONS: Extract all relevant numbers, KPIs, and financial data from the document(s) above. Use these numbers as the basis for your analysis, recommendations, and risk assessment. Cite the numbers in your output.\n';
       }
     }
 
